@@ -4,10 +4,41 @@ import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 import "./styles/createContent.css";
 
+// This component is used in the Dashboard.jsx file to create new content items. 
 const CreateContent = ({ isOpen, onClose, onSuccess }) => {
+  const CONTENT_TEMPLATES = [
+    // It includes a modal form with fields for title, text, and status, as well as a dropdown to select from predefined content templates.
+    {
+
+      id: "Company Announcement",
+      name: "Company Announcement",
+      title: "Company Announcement: ",
+      text: "Share company news and updates:\n\n• Key announcement:\n• Why it matters:\n• Call to action:",
+    },
+    {
+      id: "Product Launch",
+      name: "New Product",
+      title: "The Product: ",
+      text: "Introduce your new product:\n\n• Key features:\n• Who will benefit:\n• Launch date & availability:",
+    },
+    {
+      id: "Product Update",
+      name: "Product Update",
+      title: "The ProductUpdate: ",
+      text: " What’s new?\n\n• Feature update:\n• Who it helps:\n• How to get started:",
+    },
+    {
+      id: "Events",
+      name: "Event Promotion",
+      title: "Join Us: ",
+      text: " Event details\n\n• Date:\n• Time:\n• What you’ll learn:\n• Register link:",
+    },
+  ];
+  
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [status, setStatus] = useState("Draft");
+  const [selectedTemplate, setSelectedTemplate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const auth = getAuth();
@@ -49,6 +80,35 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
+  // Handle template selection and populate the form fields based on the selected template
+  const handleTemplateSelect = (templateId) => {
+    if (templateId === "") {
+      // Blank content - clear the fields
+      setSelectedTemplate("");
+      setTitle("");
+      setText("");
+      return;
+    }
+
+    const template = CONTENT_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+
+    setSelectedTemplate(templateId);
+    setTitle(template.title);
+    setText(template.text);
+  };
+
+  // Handle closing the modal and resetting the form
+  const handleClose = () => {
+    // Reset form to blank state
+    setTitle("");
+    setText("");
+    setStatus("Draft");
+    setSelectedTemplate("");
+    setError(null);
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -60,6 +120,22 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="create-content-form">
+          <div className="form-group">
+            <label htmlFor="template">Start from a Template</label>
+            <select
+              id="template"
+              value={selectedTemplate}
+              onChange={(e) => handleTemplateSelect(e.target.value)}
+              disabled={loading}
+            >
+              <option value="">Blank Content</option>
+              {CONTENT_TEMPLATES.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="form-group">
             <label htmlFor="title">Title</label>
             <input
@@ -106,7 +182,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
             <button
               type="button"
               className="btn-cancel"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={loading}
             >
               Cancel
