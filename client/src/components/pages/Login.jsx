@@ -9,6 +9,7 @@ import {
 } from "firebase/auth";
 import { auth } from "../../firebase";
 import "../styles/login.css";
+import {AiOutlineEye, AiOutlineEyeInvisible} from 'react-icons/ai'
 
 /*
  * LOGIN PAGE COMPONENT (Updated by Tanvir)
@@ -28,6 +29,8 @@ export default function Login({ onLogin }) {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState(null);
   const [forgotMessage, setForgotMessage] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  
 
   const googleProvider = new GoogleAuthProvider();
 
@@ -51,6 +54,11 @@ export default function Login({ onLogin }) {
     }
   };
 
+  /** DRAVEN
+   * Handles resending the email verification to the user.
+   * This function is triggered when the user clicks the "Resend verification email" button after a failed login attempt due to unverified email.
+   * It uses Firebase's sendEmailVerification function to send a new verification email to the user's email address.
+   */
   const handleResendVerification = async () => {
     if (!unverifiedUser) return;
     try {
@@ -63,6 +71,11 @@ export default function Login({ onLogin }) {
     }
   };
 
+  /** DRAVEN
+   * Handles the submission of the login form.
+   * @param {*} e - The event object.
+   * @returns {Promise<void>} - A promise that resolves when the form is submitted.
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -124,12 +137,20 @@ export default function Login({ onLogin }) {
     }
   };
 
-  const [showPassword, setShowPassword] = useState(false);
-
+  /** DRAVEN
+   * Toggles the visibility of the password input field.
+   * When the user clicks the "Show" or "Hide" button next to the password field, this function is called to switch between showing the password as plain text or masking it.
+   * It updates the showPassword state variable, which controls the type of the password input field (text or password).
+   */
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
 
+  /** DRAVEN
+   * Handles the password reset process when the user clicks the "Forgot Password?" button.
+   * It validates the email input and uses Firebase's sendPasswordResetEmail function to send a password reset email to the user.
+   * It also manages loading, error, and success states to provide feedback to the user during the process.
+   */
   const handleForgotPassword = async () => {
     setForgotError(null);
     setForgotMessage(null);
@@ -215,9 +236,9 @@ export default function Login({ onLogin }) {
               <button
                 type="button"
                 onClick={togglePasswordVisibility}
-                className="toggle-password-btn"
+                className="eye-icon-btn"
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? <AiOutlineEyeInvisible /> : <AiOutlineEye />}
               </button>
             </div>
           </div>
