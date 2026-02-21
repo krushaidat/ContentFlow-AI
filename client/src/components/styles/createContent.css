@@ -1,3 +1,106 @@
+.templates-header {
+  background: none;
+  border-bottom: none;
+  padding: 24px 24px 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.templates-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.templates-header-icon {
+  font-size: 28px;
+  color: #7c3aed;
+  margin-bottom: 4px;
+}
+.templates-header-desc {
+  font-size: 14px;
+  color: #6b7280;
+}
+.templates-search-row {
+  padding: 0 24px 16px 24px;
+}
+.templates-search {
+  width: 100%;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 15px;
+  margin-bottom: 0;
+}
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+  padding: 0 24px 24px 24px;
+}
+.template-card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(124,58,237,0.04);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 16px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+.template-card:hover {
+  box-shadow: 0 8px 24px rgba(124,58,237,0.10);
+  border-color: #c7d2fe;
+}
+.template-card-icon {
+  font-size: 32px;
+  background: #f3e8ff;
+  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.template-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.template-card-title {
+  font-weight: 600;
+  color: #111827;
+  font-size: 16px;
+}
+.template-card-desc {
+  color: #6b7280;
+  font-size: 13px;
+}
+.template-card-meta {
+  color: #9ca3af;
+  font-size: 12px;
+}
+.template-card-actions {
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+}
+.btn-template-select {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-template-select:hover {
+  background: #6d28d9;
+}
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -172,7 +275,7 @@
   cursor: not-allowed;
 }
 
-// AMINAH: added styles for the templates modal to match the overall design and provide a clean, user-friendly interface for selecting content templates
+/* AMINAH: added styles for the templates modal to match the overall design and provide a clean, user-friendly interface for selecting content templates */
 /* Templates modal styles */
 .templates-overlay {
   position: fixed;

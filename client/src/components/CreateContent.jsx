@@ -120,7 +120,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
-  // AMINAH: added template selection UI and integrated it with the form fields to allow users to quickly populate content based on common structures. 
+  // AMINAH: added template selection UI and integrated it with the form fields to allow users to quickly populate content based on common structures. Also added error handling and loading states for better UX during content creation.
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
