@@ -120,7 +120,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
-  // AMINAH: added template selection UI and integrated it with the form fields to allow users to quickly populate content based on common structures. Also added error handling and loading states for better UX during content creation.
+  // AMINAH: added template selection UI and integrated it with the form fields to allow users to quickly populate content based on common structures. 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -211,31 +211,36 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         {showTemplates && (
           <div className="templates-overlay" onClick={() => setShowTemplates(false)}>
             <div className="templates-panel" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>Templates</h2>
+              <div className="modal-header templates-header">
+                <div className="templates-header-left">
+                  <span className="templates-header-icon">📄</span>
+                  <h2>Templates</h2>
+                  <span className="templates-header-desc">Manage and modify templates to ensure brand consistency.</span>
+                </div>
                 <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
               </div>
-              <div style={{ padding: 20 }}>
+              <div className="templates-search-row">
                 <input
+                  className="templates-search"
                   placeholder="Search templates..."
-                  style={{ width: "100%", padding: 10, borderRadius: 6, border: "1px solid #d1d5db", marginBottom: 16 }}
                 />
-
-                <div className="templates-grid">
-                  {CONTENT_TEMPLATES.map((t) => (
-                    <div key={t.id} className="template-card" onClick={() => handleTemplateSelect(t.id)}>
-                      <div className="template-icon">📄</div>
-                      <div className="template-body">
-                        <div className="template-title">{t.name}</div>
-                        <div className="template-desc">{t.description}</div>
-                        <div className="template-meta">Last modified {t.modified}</div>
-                      </div>
-                      <div className="template-actions">
-                        <button className="btn-cancel" onClick={(e) => { e.stopPropagation(); setShowTemplates(false); handleTemplateSelect(t.id); }}>Use</button>
-                      </div>
+              </div>
+              <div className="templates-grid">
+                {CONTENT_TEMPLATES.map((t) => (
+                  <div key={t.id} className="template-card">
+                    <div className="template-card-icon">
+                      {t.id === "Company Announcement" ? "📢" : t.id === "Product Launch" ? "🛒" : t.id === "Product Update" ? "🎫" : "✉️"}
                     </div>
-                  ))}
-                </div>
+                    <div className="template-card-body">
+                      <div className="template-card-title">{t.name}</div>
+                      <div className="template-card-desc">{t.description}</div>
+                      <div className="template-card-meta">Last modified {t.modified}</div>
+                    </div>
+                    <div className="template-card-actions">
+                      <button className="btn-template-select" onClick={() => { setShowTemplates(false); handleTemplateSelect(t.id); }}>Select</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
