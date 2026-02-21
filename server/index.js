@@ -26,7 +26,7 @@ app.use(
 const PORT = process.env.PORT || 5000;
 
 // Abdalaa: Create the Gemini client using the key in server/.env
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.AIzaSyBWJRwrY9N9C8zBs8XxcK_hiczt0amajdc });
 
 // Quick health check route
 app.get("/api/test", (req, res) => {
