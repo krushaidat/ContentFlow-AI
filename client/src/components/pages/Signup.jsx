@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, s
 import { auth } from '../../firebase';
 import '../styles/Signup.css';
 import Login from "../pages/Login";
+import {AiOutlineEye, AiOutlineEyeInvisible} from 'react-icons/ai'
 
 /**
  * SIGNUP PAGE COMPONENT (Updated by Tanvir)
@@ -24,6 +25,8 @@ function Signup() {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const googleProvider = new GoogleAuthProvider();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -159,6 +162,24 @@ function Signup() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  /** DRAVEN
+   * Toggles the visibility of the password input field.
+   * When the user clicks the "Show" or "Hide" button next to the password field, this function is called to switch between showing the password as plain text or masking it.
+   * It updates the showPassword state variable, which controls the type of the password input field (text or password).
+   */
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  /** DRAVEN
+   * Toggles the visibility of the confirm password input field.
+   * When the user clicks the "Show" or "Hide" button next to the confirm password field, this function is called to switch between showing the confirm password as plain text or masking it.
+   * It updates the showConfirmPassword state variable, which controls the type of the confirm password input field (text or password).
+   */
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
   };
 
   // UI for the signup page with form fields, error handling, and Google sign-up option

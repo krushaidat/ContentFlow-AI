@@ -17,7 +17,13 @@ export default function Dashboard() {
   const [editingContent, setEditingContent] = useState({ title: "", text: "", status: "Draft" });
 
   const auth = getAuth();
-  
+  /** DRAVEN
+   * Sets up an authentication state listener using Firebase's onAuthStateChanged function.
+   * When the authentication state changes (e.g., user signs in or out), this listener is triggered.
+   * If a user is authenticated, it fetches the user's content from Firestore.
+   * If no user is authenticated, it sets an error message and redirects to the login page.
+   * The listener is cleaned up when the component unmounts to prevent memory leaks.
+   */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
@@ -33,6 +39,11 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [navigate]);
 
+  /** DRAVEN
+   * Fetches content from Firestore for the authenticated user.
+   * @param {*} user - The authenticated user object.
+   * @returns {Promise<void>} - A promise that resolves when the content is fetched.
+   */
   const fetchContent = async (user) => {
     const currentUser = user || auth.currentUser;
     if (!currentUser) {
