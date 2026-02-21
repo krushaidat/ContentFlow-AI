@@ -67,6 +67,34 @@
   font-weight: 500;
 }
 
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper input {
+  flex: 1;
+  padding-right: 3rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  background: transparent;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: #374151;
+}
+
+.password-toggle svg {
+  display: block;
+}
+
 .form-group input::placeholder {
   color: #9ca3af;
 }

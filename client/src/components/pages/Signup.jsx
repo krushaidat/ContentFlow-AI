@@ -24,6 +24,8 @@ function Signup() {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const googleProvider = new GoogleAuthProvider();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -95,6 +97,7 @@ function Signup() {
       newErrors.confirmPassword = 'Passwords do not match';
     }
     
+    
     return newErrors;
   };
 
@@ -137,6 +140,7 @@ function Signup() {
         password: '',
         confirmPassword: ''
       });
+
       setErrors({});
 
       // Show success message
@@ -222,7 +226,6 @@ function Signup() {
               {errors.lastName && <span className="error-message">{errors.lastName}</span>}
             </div>
           </div>
-          
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
             <input
@@ -237,10 +240,12 @@ function Signup() {
             {errors.email && <span className="error-message">{errors.email}</span>}
           </div>
           
+          
           <div className="form-group">
             <label htmlFor="password">Password</label>
+            <div className="password-wrapper">
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               id="password"
               name="password"
               value={formData.password}
@@ -248,13 +253,34 @@ function Signup() {
               placeholder="ContentFlow123!"
               className={errors.password ? 'input-error' : ''}
             />
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowPassword((s) => !s)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 3l18 18" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M10.58 10.58a3 3 0 104.24 4.24" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14.12 14.12C12.84 15.4 11.06 16 9 16c-5-0-8-4-8-4s2.5-4 8-4c1.88 0 3.68.6 5.12 1.6" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 12s3-7 11-7 11 7 11 7-3 7-11 7S1 12 1 12z" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+            </button>
+            </div>
             {errors.password && <span className="error-message">{errors.password}</span>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
+            <div className="password-wrapper">
             <input
-              type="password"
+              type={showConfirmPassword ? 'text' : 'password'}
               id="confirmPassword"
               name="confirmPassword"
               value={formData.confirmPassword}
@@ -262,6 +288,26 @@ function Signup() {
               placeholder="ContentFlow123!"
               className={errors.confirmPassword ? 'input-error' : ''}
             />
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowConfirmPassword((s) => !s)}
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+            >
+              {showConfirmPassword ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 3l18 18" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M10.58 10.58a3 3 0 104.24 4.24" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14.12 14.12C12.84 15.4 11.06 16 9 16c-5-0-8-4-8-4s2.5-4 8-4c1.88 0 3.68.6 5.12 1.6" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 12s3-7 11-7 11 7 11 7-3 7-11 7S1 12 1 12z" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+            </button>
+            </div>
             {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
           </div>
           
