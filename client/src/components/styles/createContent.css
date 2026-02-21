@@ -171,3 +171,67 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+// AMINAH: added styles for the templates modal to match the overall design and provide a clean, user-friendly interface for selecting content templates
+/* Templates modal styles */
+.templates-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+}
+
+.templates-panel {
+  background: #ffffff;
+  width: 94%;
+  max-width: 900px;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(2,6,23,0.2);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.template-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid #eef2ff;
+  background: linear-gradient(180deg, #ffffff, #fbfbff);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+
+.template-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border-color: #e6e9ff;
+}
+
+.template-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f3e8ff;
+  font-size: 22px;
+}
+
+.template-body { flex: 1; }
+.template-title { font-weight: 600; color: #111827; margin-bottom: 6px; }
+.template-desc { color: #6b7280; font-size: 13px; margin-bottom: 6px; }
+.template-meta { color: #9ca3af; font-size: 12px; }
+.template-actions { margin-left: 8px; }
+
