@@ -1,13 +1,7 @@
 /**
  * Workflow Page
  * Author: Abdalaa
- *
- * This page displays user content grouped by workflow stage.
- * We fetch content from Firestore and filter by:
- *  - logged-in user (userId)
- *  - selected stage (status field in Firestore)
- *
- * UI upgraded with purple accents and a modern layout.
+
  */
 
 import React, { useEffect, useState } from "react";
@@ -15,12 +9,11 @@ import { collection, getDocs, query, where, orderBy, limit } from "firebase/fire
 import { db, auth } from "../../firebase";
 import "../styles/workflow.css";
 
-// These stages must match exactly what we store in Firestore
+
 const STAGES = ["Draft", "Planning", "Review", "Update", "Ready-To-Post", "Posted"];
 
 /**
- * Small helper to assign badge colors based on stage.
- * Makes the UI feel more dynamic instead of flat.
+ * Abdalaa: helper for stage badge colors
  */
 const stageBadgeClass = (stage) => {
   switch (stage) {
@@ -42,41 +35,49 @@ const stageBadgeClass = (stage) => {
 };
 
 const Workflow = () => {
-  // Stage selected in dropdown
+  
   const [selectedStage, setSelectedStage] = useState("Draft");
 
-  // Content returned from Firestore
+ 
   const [items, setItems] = useState([]);
 
-  // UI states
+
+  const [selectedItem, setSelectedItem] = useState(null);
+
+ 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // ai state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiResult, setAiResult] = useState(null);
+
   /**
-   * Whenever selectedStage changes,
-   * fetch content from Firestore again.
+   * Abdalaa:
+   * Whenever the stage changes, we get the firestore
    */
   useEffect(() => {
     const fetchContent = async () => {
       setLoading(true);
       setError("");
 
-      try {
-        // Collection name confirmed from Firebase console
-        const colRef = collection(db, "content");
+      // this resets the ai page when you refresh
+      setSelectedItem(null);
+      setAiResult(null);
+      setAiError("");
 
-        // Get currently logged in user
+      try {
         const uid = auth.currentUser?.uid;
 
-        // Safety check — if uid missing something is wrong with auth
         if (!uid) {
           setError("User not authenticated.");
           setItems([]);
-          setLoading(false);
           return;
         }
 
-      
+        const colRef = collection(db, "content");
+
         const q = query(
           colRef,
           where("userId", "==", uid),
@@ -105,20 +106,58 @@ const Workflow = () => {
     fetchContent();
   }, [selectedStage]);
 
+  /**
+    abdalaa:
+   calls the backend endpoint that talks to gemini
+   */
+  const runAiValidation = async () => {
+    if (!selectedItem) return;
+  
+    setAiLoading(true);
+    setAiError("");
+    setAiResult(null);
+  
+    try {
+      const payload = {
+        title: selectedItem.title,
+        text: selectedItem.text,
+        stage: selectedItem.status,
+      };
+  
+      const res = await fetch("/api/ai/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+  
+      //  if there is a error it shows it clearly
+      const data = await res.json().catch(() => null);
+  
+      if (!res.ok) {
+        throw new Error(data?.error || `Request failed (${res.status})`);
+      }
+  
+      setAiResult(data);
+    } catch (err) {
+      console.error("AI validate frontend error:", err);
+      setAiError(err.message || "Could not validate content.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
   return (
     <div className="workflow-bg">
       <div className="workflow-page modern">
-
-        {/* Header Section */}
+        {/* Header */}
         <div className="wf-header">
           <div>
             <h2 className="modern-title">Workflow</h2>
             <p className="wf-subtitle">
-              Manage your content stages in a clean, purple interface ✨
+              Manage your content stages with a clean purple workflow ✨
             </p>
           </div>
 
-          {/* Custom styled dropdown */}
+          {/* Dropdown */}
           <div className="wf-stage-select">
             <span className="wf-label">Currently Viewing</span>
 
@@ -139,17 +178,14 @@ const Workflow = () => {
           </div>
         </div>
 
-        {/* Two-column layout */}
+        {/* 2-column layout */}
         <div className="wf-grid">
-
-          {/* LEFT SIDE — Content List */}
+          {/* LEFT — Content list */}
           <section className="wf-card">
             <div className="wf-card-header">
               <div className="wf-card-title">
                 {selectedStage} Content
-                <span className={stageBadgeClass(selectedStage)}>
-                  {selectedStage}
-                </span>
+                <span className={stageBadgeClass(selectedStage)}>{selectedStage}</span>
               </div>
 
               <div className="wf-card-meta">
@@ -158,19 +194,14 @@ const Workflow = () => {
             </div>
 
             <div className="wf-card-body">
-
-              {error && (
-                <div className="wf-alert wf-alert-error">
-                  {error}
-                </div>
-              )}
+              {error && <div className="wf-alert wf-alert-error">{error}</div>}
 
               {!loading && !error && items.length === 0 && (
                 <div className="wf-empty">
                   <div className="wf-empty-icon">🟣</div>
                   <div className="wf-empty-title">No content found</div>
                   <div className="wf-empty-sub">
-                    Try switching stages or create new content from Dashboard.
+                    Switch stages or create content from Dashboard.
                   </div>
                 </div>
               )}
@@ -178,19 +209,25 @@ const Workflow = () => {
               {!loading && !error && items.length > 0 && (
                 <ul className="wf-list">
                   {items.map((item) => (
-                    <li key={item.id} className="wf-item">
+                    <li
+                      key={item.id}
+                      className={`wf-item ${
+                        selectedItem?.id === item.id ? "wf-item-active" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setAiResult(null);
+                        setAiError("");
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
                       <div className="wf-item-top">
-                        <div className="wf-item-title">
-                          {item.title}
-                        </div>
-                        <span className={stageBadgeClass(item.status)}>
-                          {item.status}
-                        </span>
+                        <div className="wf-item-title">{item.title}</div>
+                        <span className={stageBadgeClass(item.status)}>{item.status}</span>
                       </div>
 
-                      <div className="wf-item-text">
-                        {item.text}
-                      </div>
+                      <div className="wf-item-text">{item.text}</div>
 
                       <div className="wf-item-footer">
                         <span className="wf-dot" />
@@ -205,28 +242,90 @@ const Workflow = () => {
             </div>
           </section>
 
-          {/* RIGHT SIDE — AI Placeholder */}
+          {/* RIGHT — AI Validation */}
           <aside className="wf-card">
             <div className="wf-card-header">
               <div className="wf-card-title">
                 AI Validation
                 <span className="badge badge-ai">GEMINI</span>
               </div>
-              <div className="wf-card-meta">Pending</div>
+              <div className="wf-card-meta">{aiLoading ? "Working..." : "Ready"}</div>
             </div>
 
             <div className="wf-card-body">
-              <p>
-                This panel will display Gemini AI feedback and validation.
-              </p>
+              {!selectedItem && (
+                <div className="wf-empty">
+                  <div className="wf-empty-icon">🤖</div>
+                  <div className="wf-empty-title">Select an item first</div>
+                  <div className="wf-empty-sub">
+                    Click a content card on the left, then run validation.
+                  </div>
+                </div>
+              )}
+
+              {selectedItem && (
+                <>
+                  <div className="ai-selected">
+                    <div className="ai-selected-title">{selectedItem.title}</div>
+                    <div className="ai-selected-sub">{selectedItem.status}</div>
+                  </div>
+
+                  <button className="ai-btn" onClick={runAiValidation} disabled={aiLoading}>
+                    {aiLoading ? "Validating..." : "Run AI Validation"}
+                  </button>
+
+                  {aiError && <div className="wf-alert wf-alert-error">{aiError}</div>}
+
+                  {aiResult && (
+                    <div className="ai-result">
+                      <div className="ai-score">
+                        Brand Score: <strong>{aiResult.brandScore ?? "N/A"}</strong>
+                      </div>
+
+                      {aiResult.summary && <p className="ai-summary">{aiResult.summary}</p>}
+
+                      {Array.isArray(aiResult.issues) && aiResult.issues.length > 0 && (
+                        <>
+                          <h4 className="ai-h">Issues</h4>
+                          <ul className="ai-list">
+                            {aiResult.issues.map((x, i) => (
+                              <li key={i}>
+                                <strong>{x.type}:</strong> {x.message}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+
+                      {Array.isArray(aiResult.suggestions) && aiResult.suggestions.length > 0 && (
+                        <>
+                          <h4 className="ai-h">Suggestions</h4>
+                          <ul className="ai-list">
+                            {aiResult.suggestions.map((s, i) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+
+                      {/* Debug only */}
+                      {aiResult.raw && (
+                        <details style={{ marginTop: 10 }}>
+                          <summary>Raw Gemini output (debug)</summary>
+                          <pre style={{ whiteSpace: "pre-wrap" }}>{aiResult.raw}</pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </aside>
         </div>
 
         <p className="workflow-note modern-note">
-          Automation will be powered by Gemini API integrations per stage.
+          AI will be powered by Gemini through the backend endpoint.
         </p>
-
       </div>
     </div>
   );
