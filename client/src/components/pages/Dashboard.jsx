@@ -53,7 +53,7 @@ export default function Dashboard() {
     }
     try {
       setLoading(true);
-      const q = query(collection(db, "content"), orderBy("createdAt", "desc"));
+      const q = query(collection(db, "content"),where("userId", "==", currentUser.uid), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
       const items = querySnapshot.docs.map((doc) => ({
         id: doc.id,
