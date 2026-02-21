@@ -5,8 +5,15 @@ import { auth } from '../../firebase';
 import '../styles/Signup.css';
 import Login from "../pages/Login";
 
+/**
+ * SIGNUP PAGE COMPONENT (Updated by Tanvir)
+ * - Changed from single "Full Name" field to separate "First Name" and "Last Name" fields
+ * - Maintains two-column layout with form on left, info panel on right
+ * - Features email verification and Google sign-up option
+ */
 function Signup() {
   const navigate = useNavigate();
+  // TANVIR: Split formData to include separate firstName and lastName fields
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -61,10 +68,12 @@ function Signup() {
   const validateForm = () => {
     const newErrors = {};
     
+    // TANVIR: Validate firstName field
     if (!formData.firstName.trim()) {
       newErrors.firstName = 'First name is required';
     }
-
+    
+    // TANVIR: Validate lastName field
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'Last name is required';
     }
@@ -108,10 +117,10 @@ function Signup() {
         formData.password
       );
 
-      // Update user profile with display name constructed from first + last name
-      const displayName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+      // TANVIR: Combine first and last name for display name in Firebase auth
+      const fullName = `${formData.firstName} ${formData.lastName}`;
       await updateProfile(userCredential.user, {
-        displayName
+        displayName: fullName
       });
 
       // Send email verification
@@ -120,7 +129,7 @@ function Signup() {
       // Log out the user immediately after signup to enforce email verification
       await signOut(auth); 
 
-      // Clear form
+      // Clear form with updated field names
       setFormData({
         firstName: '',
         lastName: '',
@@ -166,7 +175,8 @@ function Signup() {
         </div>
         
         <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-row">
+          {/* TANVIR: Split name field into firstName and lastName */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
               <label htmlFor="firstName">First Name</label>
               <input
@@ -175,6 +185,7 @@ function Signup() {
                 name="firstName"
                 value={formData.firstName}
                 onChange={handleChange}
+                placeholder="John"
                 className={errors.firstName ? 'input-error' : ''}
               />
               {errors.firstName && <span className="error-message">{errors.firstName}</span>}
@@ -188,7 +199,7 @@ function Signup() {
                 name="lastName"
                 value={formData.lastName}
                 onChange={handleChange}
-
+                placeholder="Doe"
                 className={errors.lastName ? 'input-error' : ''}
               />
               {errors.lastName && <span className="error-message">{errors.lastName}</span>}
@@ -202,6 +213,7 @@ function Signup() {
               name="email"
               value={formData.email}
               onChange={handleChange}
+              placeholder="example@contentflow.ai"
               className={errors.email ? 'input-error' : ''}
             />
             {errors.email && <span className="error-message">{errors.email}</span>}
@@ -209,70 +221,29 @@ function Signup() {
           
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <div className="password-wrapper">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="min. 8 characters"
-                className={errors.password ? 'input-error' : ''}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword((s) => !s)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 3l18 18" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M10.58 10.58a3 3 0 104.24 4.24" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M14.12 14.12C12.84 15.4 11.06 16 9 16c-5-0-8-4-8-4s2.5-4 8-4c1.88 0 3.68.6 5.12 1.6" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 12s3-7 11-7 11 7 11 7-3 7-11 7S1 12 1 12z" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </button>
-            </div>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="ContentFlow123!"
+              className={errors.password ? 'input-error' : ''}
+            />
             {errors.password && <span className="error-message">{errors.password}</span>}
           </div>
 
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
-            <div className="password-wrapper">
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className={errors.confirmPassword ? 'input-error' : ''}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowConfirmPassword((s) => !s)}
-                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-              >
-                {showConfirmPassword ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 3l18 18" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M10.58 10.58a3 3 0 104.24 4.24" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M14.12 14.12C12.84 15.4 11.06 16 9 16c-5-0-8-4-8-4s2.5-4 8-4c1.88 0 3.68.6 5.12 1.6" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 12s3-7 11-7 11 7 11 7-3 7-11 7S1 12 1 12z" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </button>
-            </div>
+            <input
+              type="password"
+              id="confirmPassword"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              placeholder="ContentFlow123!"
+              className={errors.confirmPassword ? 'input-error' : ''}
+            />
             {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
           </div>
           

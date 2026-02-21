@@ -25,6 +25,7 @@
   color: #1a1a1a;
   margin-bottom: 0.75rem;
   letter-spacing: -0.5px;
+  text-align: center;
 }
 
 .auth-subtitle {
@@ -32,6 +33,7 @@
   font-size: 1.0625rem;
   line-height: 1.6;
   font-weight: 400;
+  text-align: center;
 }
 
 .auth-form {
@@ -60,7 +62,7 @@
   border-radius: 10px;
   font-size: 1rem;
   transition: all 0.3s ease;
-  background: #fafbfc;
+  background: transparent;
   color: #1a1a1a;
   font-weight: 500;
 }
@@ -106,7 +108,7 @@
 
 .form-group input.input-error {
   border-color: #ef4444;
-  background: #fef2f2;
+  background: transparent;
 }
 
 .error-message {
@@ -315,4 +317,3 @@
     font-size: 1rem;
   }
 }
-EOF
