@@ -4,6 +4,7 @@ import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy }
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
+import CreateTemplate from "../../functions/CreateTemplate";
 import "../styles/dashboard.css";
 
 export default function Dashboard() {
@@ -15,7 +16,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", status: "Draft" });
-
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const auth = getAuth();
   /** DRAVEN
    * Sets up an authentication state listener using Firebase's onAuthStateChanged function.
@@ -149,7 +150,7 @@ export default function Dashboard() {
       const contentRef = doc(db, "content", editingId);
       await updateDoc(contentRef, {
         title: editingContent.title,
-        text: editingContent.text,
+        text: editingContent.text, 
         status: editingContent.status,
       });
       setEditingId(null);
@@ -186,17 +187,30 @@ export default function Dashboard() {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h2>My Content</h2>
-        <button
-          className="btn-create"
-          onClick={() => setIsModalOpen(true)}
-        >
-          + Create Content
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            className="btn-create"
+            onClick={() => setIsTemplateModalOpen(true)}
+            > 
+            + Create Template
+          </button>
+          <button
+            className="btn-create"
+            onClick={() => setIsModalOpen(true)}
+          >
+            + Create Content
+          </button>
+        </div>
       </div>
 
       <CreateContent
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={() => fetchContent(user)}
+      />
+      <CreateTemplate
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
         onSuccess={() => fetchContent(user)}
       />
 

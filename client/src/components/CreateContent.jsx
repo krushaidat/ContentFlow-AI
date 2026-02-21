@@ -70,7 +70,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         title: title.trim(),
         text: text.trim(),
         status,
-        userId: user.uid,
+        createdBy: user.uid,
         createdAt: new Date().toISOString(),
       });
 
