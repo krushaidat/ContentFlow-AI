@@ -15,6 +15,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", status: "Draft" });
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
 
   const auth = getAuth();
   /** DRAVEN
@@ -180,25 +181,48 @@ export default function Dashboard() {
     );
   }
 
-  //(Tanvir- merge fix): Removed duplicate handleSaveChanges, handleDeleteContent, and undefined state references
-  
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h2>My Content</h2>
-        <button
-          className="btn-create"
-          onClick={() => setIsModalOpen(true)}
-        >
-          + Create Content
-        </button>
+    <div className="dashboard-main">
+      {/* AMINAH: Top section with Create Content and Templates cards */}
+      <div className="dashboard-top-cards">
+        <div className="dashboard-card create-content-card">
+          <div className="dashboard-card-icon">
+            <span role="img" aria-label="Create Content" style={{fontSize: 32}}>📝</span>
+          </div>
+          <div className="dashboard-card-body">
+            <div className="dashboard-card-title">Create Content</div>
+            <div className="dashboard-card-desc">Start a new post. Choose a template and write your content.</div>
+            <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
+              + Create Content
+            </button>
+          </div>
+        </div>
+        <div className="dashboard-card templates-card">
+          <div className="dashboard-card-icon">
+            <span role="img" aria-label="Templates" style={{fontSize: 32}}>📄</span>
+          </div>
+          <div className="dashboard-card-body">
+            <div className="dashboard-card-title">Templates</div>
+            <div className="dashboard-card-desc">Manage and modify templates to ensure brand consistency.</div>
+            <button className="dashboard-card-btn secondary" onClick={() => setIsTemplatesModalOpen(true)}>
+              Manage Templates
+            </button>
+          </div>
+        </div>
       </div>
 
+      {/* AMINAH: CreateContent modal */}
       <CreateContent
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => fetchContent(user)}
       />
+
+      {/* AMINAH: Templates modal placeholder (implement as needed) */}
+      {/* {isTemplatesModalOpen && <TemplatesModal onClose={() => setIsTemplatesModalOpen(false)} />} */}
+
+      {/* AMINAH: Section title */}
+      <h2 className="dashboard-section-title">My Content</h2>
 
       {error && <div className="error-alert">{error}</div>}
 
@@ -209,47 +233,31 @@ export default function Dashboard() {
           <p>No content yet. Create your first piece of content!</p>
         </div>
       ) : (
-        <div className="content-grid">
+        <div className="dashboard-content-list">
           {content.map((item) => (
-            <div key={item.id} className="content-card">
-              <div className="card-header">
-                <h3 className="card-title">{item.title || "Untitled"}</h3>
-                <div className="card-actions">
-                  <button
-                    className="icon-btn edit"
-                    onClick={(e) => handleEditClick(e, item)}
-                    title="Edit"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    className="icon-btn delete"
-                    onClick={(e) => handleDeleteClick(e, item.id)}
-                    title="Delete"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
+            <div key={item.id} className="dashboard-content-card">
+              <div className="dashboard-content-header">
+                {/* AMINAH: Status badge and menu */}
+                <span className={`dashboard-badge ${getStatusBadgeClass(item.status)}`}>{item.status || "Draft"}</span>
+                <span className="dashboard-content-menu">•••</span>
               </div>
-              
-              <span className={`badge ${getStatusBadgeClass(item.status)}`}>
-                {item.status || "Draft"}
-              </span>
-              
-              <p className="card-text">
-                {(item.text || "").substring(0, 150)}
-                {item.text?.length > 150 ? "..." : ""}
-              </p>
-              
-              <div className="card-footer">
-                <span className="card-date">
-                  {item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}
+              <div className="dashboard-content-title">{item.title || "Untitled"}</div>
+              {/* AMINAH: Gemini validation badge example (replace with real logic if needed) */}
+              <div className="dashboard-gemini-badge-row">
+                <span className={`dashboard-gemini-badge ${item.status === "FAILED" ? "failed" : "pending"}`}>
+                  {item.status === "FAILED" ? "Gemini Validation Failed" : "Gemini Validation Pending"}
                 </span>
               </div>
+              <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
+              <div className="dashboard-content-actions">
+                <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+                <button className="icon-btn delete" onClick={(e) => handleDeleteClick(e, item.id)} title="Delete">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+              <div className="dashboard-content-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</div>
             </div>
           ))}
         </div>

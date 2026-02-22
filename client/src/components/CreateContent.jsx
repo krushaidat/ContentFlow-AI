@@ -4,7 +4,9 @@ import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 import "./styles/createContent.css";
 
+// Aminah:
 // This component is used in the Dashboard.jsx file to create new content items. 
+// It includes a form with fields for title, text, and status, as well as a template selection feature that allows users to quickly populate the form with predefined structures for common content types.
 const CreateContent = ({ isOpen, onClose, onSuccess }) => {
   const CONTENT_TEMPLATES = [
     {
@@ -40,6 +42,9 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
       modified: "Feb 2, 2026",
     },
   ];
+
+  // AMINAH:
+  // State variables for form fields, template selection, loading state, and error handling
   
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -87,6 +92,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
+  // AMINAH:
   // Handle template selection and populate the form fields based on the selected template
   const handleTemplateSelect = (templateId) => {
     if (templateId === "") {
