@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
-  const [editingContent, setEditingContent] = useState({ title: "", text: "", status: "Draft" });
+  const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
 
   const auth = getAuth();
   
@@ -22,6 +22,8 @@ export default function Dashboard() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       if (user) {
+        // Only fetch content if user is authenticated
+        // Prevents "User not authenticated" errors
         fetchContent();
       } else {
         setLoading(false);
@@ -33,6 +35,17 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [navigate]);
 
+  /**
+   * Tanvir- fetchContent - Fixes user permissions & security rules compliance
+   * 
+   - Fetches content from Firestore filtered by:
+   - Fetches only the currently logged-in user's content from Firestore.
+   - Filters by 'createdBy' field matching the user's UID to comply with Firestore security rules.
+   * 
+   * Removed orderBy("createdAt") to avoid requiring a composite index in Firestore.
+   * Instead, sorting is done client-side after fetching to improve performance and reduce quota errors.
+   - This ensures users can only access their own content, enforcing data privacy and security.
+   */
   const fetchContent = async (user) => {
     const currentUser = user || auth.currentUser;
     if (!currentUser) {
@@ -42,12 +55,19 @@ export default function Dashboard() {
     }
     try {
       setLoading(true);
-      const q = query(collection(db, "content"), orderBy("createdAt", "desc"));
+      // Security fix: Filter by createdBy to only fetch user's own content
+      // This matches Firestore security rules that allow reading only own documents
+      const q = query(
+        collection(db, "content"),
+        where("createdBy", "==", currentUser.uid)
+      );
       const querySnapshot = await getDocs(q);
+      // Performance fix: Sort on client-side instead of orderBy in query
+      // Avoids needing a composite index and reduces quota errors
       const items = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      }));
+      })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setContent(items);
       setError(null);
     } catch (err) {
@@ -60,10 +80,10 @@ export default function Dashboard() {
 
   /**
    * Returns the appropriate CSS class name for a status badge
-   * based on the content's current status (draft, planning, review, etc.)
-   * This function maps each status to its corresponding color scheme
+   * based on the content's current stage (draft, planning, review, etc.)
+   * This function maps each stage to its corresponding color scheme
    */
-  const getStatusBadgeClass = (status) => {
+  const getStatusBadgeClass = (stage) => {
     const statusMap = {
       draft: "badge-draft",
       planning: "badge-planning",
@@ -71,7 +91,7 @@ export default function Dashboard() {
       update: "badge-update",
       "ready-to-post": "badge-ready",
     };
-    return statusMap[status?.toLowerCase()] || "badge-draft";
+    return statusMap[stage?.toLowerCase()] || "badge-draft";
   };
 
   /**
@@ -101,7 +121,7 @@ export default function Dashboard() {
     setEditingContent({
       title: item.title,
       text: item.text,
-      status: item.status,
+      stage: item.stage,
     });
   };
 
@@ -139,7 +159,7 @@ export default function Dashboard() {
       await updateDoc(contentRef, {
         title: editingContent.title,
         text: editingContent.text,
-        status: editingContent.status,
+        stage: editingContent.stage,
       });
       setEditingId(null);
       fetchContent(user);
@@ -156,7 +176,7 @@ export default function Dashboard() {
    */
   const handleCloseEdit = () => {
     setEditingId(null);
-    setEditingContent({ title: "", text: "", status: "Draft" });
+    setEditingContent({ title: "", text: "", stage: "Draft" });
   };
 
   if (!user && !loading) {
@@ -225,8 +245,8 @@ export default function Dashboard() {
                 </div>
               </div>
               
-              <span className={`badge ${getStatusBadgeClass(item.status)}`}>
-                {item.status || "Draft"}
+              <span className={`badge ${getStatusBadgeClass(item.stage)}`}>
+                {item.stage || "Draft"}
               </span>
               
               <p className="card-text">
@@ -279,11 +299,11 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="form-group">
-                  <label htmlFor="edit-status">Status</label>
+                  <label htmlFor="edit-stage">Stage</label>
                   <select
-                    id="edit-status"
-                    value={editingContent.status}
-                    onChange={(e) => setEditingContent({ ...editingContent, status: e.target.value })}
+                    id="edit-stage"
+                    value={editingContent.stage}
+                    onChange={(e) => setEditingContent({ ...editingContent, stage: e.target.value })}
                     className="edit-select"
                   >
                     <option value="Draft">Draft</option>
