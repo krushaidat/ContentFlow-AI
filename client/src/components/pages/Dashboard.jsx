@@ -16,6 +16,33 @@ export default function Dashboard() {
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [templates, setTemplates] = useState([
+    {
+      id: '1',
+      name: 'Company Announcement',
+      description: 'Structure for announcing company news',
+      lastModified: 'Feb 5, 2026',
+    },
+    {
+      id: '2',
+      name: 'New Product',
+      description: 'Structure for detailing new product launches',
+      lastModified: 'Feb 4, 2026',
+    },
+    {
+      id: '3',
+      name: 'Event Promotion',
+      description: 'Structure for promoting upcoming webinars, workshops, or events',
+      lastModified: 'Feb 3, 2026',
+    },
+    {
+      id: '4',
+      name: 'Weekly Newsletter',
+      description: 'Outline for curating weekly newsletter content',
+      lastModified: 'Feb 2, 2026',
+    },
+  ]);
 
   const auth = getAuth();
   /** DRAVEN
@@ -191,6 +218,23 @@ export default function Dashboard() {
     setEditingContent({ title: "", text: "", stage: "Draft" });
   };
 
+  const handleManageTemplates = () => {
+    setShowTemplatesModal(true);
+  };
+
+  const handleCloseTemplatesModal = () => {
+    setShowTemplatesModal(false);
+  };
+
+  const handleEditTemplate = (templateId) => {
+    // Open edit modal or navigate to edit page
+    alert(`Edit template ${templateId}`);
+  };
+
+  const handleDeleteTemplate = (templateId) => {
+    setTemplates(templates.filter(t => t.id !== templateId));
+  };
+
   if (!user && !loading) {
     return (
       <div className="dashboard">
@@ -226,7 +270,7 @@ export default function Dashboard() {
           <div className="dashboard-card-body">
             <div className="dashboard-card-title">Templates</div>
             <div className="dashboard-card-desc">Manage and modify templates to ensure brand consistency.</div>
-            <button className="dashboard-card-btn secondary" onClick={() => setIsTemplatesModalOpen(true)}>
+            <button className="dashboard-card-btn secondary" onClick={handleManageTemplates}>
               Manage Templates
             </button>
           </div>
@@ -240,8 +284,26 @@ export default function Dashboard() {
         onSuccess={() => fetchContent(user)}
       />
 
-      {/* AMINAH: Templates modal placeholder */}
-      {/* {isTemplatesModalOpen && <TemplatesModal onClose={() => setIsTemplatesModalOpen(false)} />} */}
+      {/* AMINAH: Templates Modal */}
+      {showTemplatesModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2>Templates</h2>
+            <button className="close-btn" onClick={handleCloseTemplatesModal}>Close</button>
+            <div className="templates-list">
+              {templates.map(template => (
+                <div className="template-card" key={template.id}>
+                  <h4>{template.name}</h4>
+                  <p>{template.description}</p>
+                  <span>Last modified: {template.lastModified}</span>
+                  <button onClick={() => handleEditTemplate(template.id)}>Edit</button>
+                  <button onClick={() => handleDeleteTemplate(template.id)}>Delete</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AMINAH: Section title */}
       <h2 className="dashboard-section-title">My Content</h2>
@@ -257,26 +319,17 @@ export default function Dashboard() {
       ) : (
         <div className="dashboard-content-list">
           {content.map((item) => (
-            <div key={item.id} className="dashboard-content-card">
+            <div key={item.id} className="dashboard-content-card content-item-box">
+              {/* AMINAH: Content item box container */}
               <div className="dashboard-content-header">
-                {/* AMINAH: Status badge and menu */}
                 <span className={`dashboard-badge ${getStatusBadgeClass(item.status)}`}>{item.status || "Draft"}</span>
                 <span className="dashboard-content-menu">•••</span>
               </div>
-              
-              <span className={`badge ${getStatusBadgeClass(item.stage)}`}>
-                {item.stage || "Draft"}
-              </span>
-              
-              <p className="card-text">
-                {(item.text || "").substring(0, 150)}
-                {item.text?.length > 150 ? "..." : ""}
-              </p>
-              
-              <div className="card-footer">
-                <span className="card-date">
-                  {item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}
-                </span>
+              <div className="content-item-title">{item.title}</div>
+              <div className="content-item-text">{item.text}</div>
+              <div className="content-item-meta">
+                <span className="content-item-stage">Stage: {item.stage || "Draft"}</span>
+                <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
               <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
               <div className="dashboard-content-actions">
@@ -287,7 +340,6 @@ export default function Dashboard() {
                   <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
               </div>
-              <div className="dashboard-content-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</div>
             </div>
           ))}
         </div>

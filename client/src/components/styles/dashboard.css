@@ -1,3 +1,39 @@
+.content-item-box {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(124,58,237,0.08);
+  border: 1px solid #e5e7eb;
+  padding: 32px 28px;
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.content-item-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+}
+.content-item-text {
+  color: #374151;
+  font-size: 15px;
+  margin-bottom: 12px;
+  white-space: pre-line;
+}
+.content-item-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+.content-item-stage {
+  font-weight: 500;
+}
+.content-item-date {
+  font-style: italic;
+}
 .dashboard-top-row {
   display: flex;
   gap: 32px;
