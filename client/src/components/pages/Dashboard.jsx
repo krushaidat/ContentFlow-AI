@@ -203,9 +203,10 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-main">
-      {/* AMINAH: Top section with Create Content and Templates cards */}
-      <div className="dashboard-top-cards">
+      {/* AMINAH: Top section with Create Content and Templates in a horizontal flex container */}
+      <div className="dashboard-top-row">
         <div className="dashboard-card create-content-card">
+          {/* AMINAH: Create Content card */}
           <div className="dashboard-card-icon">
             <span role="img" aria-label="Create Content" style={{fontSize: 32}}>📝</span>
           </div>
@@ -218,6 +219,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="dashboard-card templates-card">
+          {/* AMINAH: Templates card */}
           <div className="dashboard-card-icon">
             <span role="img" aria-label="Templates" style={{fontSize: 32}}>📄</span>
           </div>
@@ -238,7 +240,7 @@ export default function Dashboard() {
         onSuccess={() => fetchContent(user)}
       />
 
-      {/* AMINAH: Templates modal placeholder (implement as needed) */}
+      {/* AMINAH: Templates modal placeholder */}
       {/* {isTemplatesModalOpen && <TemplatesModal onClose={() => setIsTemplatesModalOpen(false)} />} */}
 
       {/* AMINAH: Section title */}
