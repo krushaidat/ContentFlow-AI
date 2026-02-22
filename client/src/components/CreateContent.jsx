@@ -53,6 +53,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [templateSearch, setTemplateSearch] = useState(""); // AMINAH: State for template search
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -228,27 +229,42 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
                 <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
               </div>
               <div className="templates-search-row">
+                 {/* AMINAH: Search input for filtering templates */}
                 <input
                   className="templates-search"
                   placeholder="Search templates..."
+                  value={templateSearch}
+                  onChange={e => setTemplateSearch(e.target.value)}
                 />
               </div>
               <div className="templates-grid">
-                {CONTENT_TEMPLATES.map((t) => (
-                  <div key={t.id} className="template-card">
-                    <div className="template-card-icon">
-                      {t.id === "Company Announcement" ? "📢" : t.id === "Product Launch" ? "🛒" : t.id === "Product Update" ? "🎫" : "✉️"}
+                 {/* AMINAH: Show only filtered templates, or a message if none found */}
+                {CONTENT_TEMPLATES.filter(t =>
+                  t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                  t.description.toLowerCase().includes(templateSearch.toLowerCase())
+                ).length === 0 ? (
+                  <div style={{ padding: 24, color: '#6b7280', fontSize: 16 }}>No templates found.</div>
+                ) : (
+                  CONTENT_TEMPLATES.filter(t =>
+                    t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                    t.description.toLowerCase().includes(templateSearch.toLowerCase())
+                  ).map((t) => (
+                    <div key={t.id} className="template-card">
+                      <div className="template-card-icon">
+                         {/* AMINAH: Icon based on template type */}
+                        {t.id === "company-announcement" ? "📢" : t.id === "new-product-launch" ? "🛒" : t.id === "Product Update" ? "🎫" : "📄"}
+                      </div>
+                      <div className="template-card-body">
+                        <div className="template-card-title">{t.name}</div>
+                        <div className="template-card-desc">{t.description}</div>
+                        <div className="template-card-meta">Last modified {t.modified}</div>
+                      </div>
+                      <div className="template-card-actions">
+                        <button className="btn-template-select" onClick={() => { setShowTemplates(false); handleTemplateSelect(t.id); }}>Select</button>
+                      </div>
                     </div>
-                    <div className="template-card-body">
-                      <div className="template-card-title">{t.name}</div>
-                      <div className="template-card-desc">{t.description}</div>
-                      <div className="template-card-meta">Last modified {t.modified}</div>
-                    </div>
-                    <div className="template-card-actions">
-                      <button className="btn-template-select" onClick={() => { setShowTemplates(false); handleTemplateSelect(t.id); }}>Select</button>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>

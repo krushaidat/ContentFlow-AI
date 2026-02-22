@@ -5,6 +5,7 @@ import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
 import "../styles/dashboard.css";
+import ManageTemplates from "../ManageTemplates";
 
 export default function Dashboard() {
   const [content, setContent] = useState([]);
@@ -15,34 +16,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
-  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-  const [templates, setTemplates] = useState([
-    {
-      id: '1',
-      name: 'Company Announcement',
-      description: 'Structure for announcing company news',
-      lastModified: 'Feb 5, 2026',
-    },
-    {
-      id: '2',
-      name: 'New Product',
-      description: 'Structure for detailing new product launches',
-      lastModified: 'Feb 4, 2026',
-    },
-    {
-      id: '3',
-      name: 'Event Promotion',
-      description: 'Structure for promoting upcoming webinars, workshops, or events',
-      lastModified: 'Feb 3, 2026',
-    },
-    {
-      id: '4',
-      name: 'Weekly Newsletter',
-      description: 'Outline for curating weekly newsletter content',
-      lastModified: 'Feb 2, 2026',
-    },
-  ]);
 
   const auth = getAuth();
   /** DRAVEN
@@ -226,14 +200,7 @@ export default function Dashboard() {
     setShowTemplatesModal(false);
   };
 
-  const handleEditTemplate = (templateId) => {
-    // Open edit modal or navigate to edit page
-    alert(`Edit template ${templateId}`);
-  };
 
-  const handleDeleteTemplate = (templateId) => {
-    setTemplates(templates.filter(t => t.id !== templateId));
-  };
 
   if (!user && !loading) {
     return (
@@ -285,25 +252,10 @@ export default function Dashboard() {
       />
 
       {/* AMINAH: Templates Modal */}
-      {showTemplatesModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h2>Templates</h2>
-            <button className="close-btn" onClick={handleCloseTemplatesModal}>Close</button>
-            <div className="templates-list">
-              {templates.map(template => (
-                <div className="template-card" key={template.id}>
-                  <h4>{template.name}</h4>
-                  <p>{template.description}</p>
-                  <span>Last modified: {template.lastModified}</span>
-                  <button onClick={() => handleEditTemplate(template.id)}>Edit</button>
-                  <button onClick={() => handleDeleteTemplate(template.id)}>Delete</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <ManageTemplates
+      isOpen={showTemplatesModal}
+      onClose={() => setShowTemplatesModal(false)}
+      />
 
       {/* AMINAH: Section title */}
       <h2 className="dashboard-section-title">My Content</h2>
