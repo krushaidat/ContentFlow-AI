@@ -4,6 +4,7 @@ import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy }
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
+import CreateTemplate from "../../functions/CreateTemplate";
 import "../styles/dashboard.css";
 import ManageTemplates from "../ManageTemplates";
 
@@ -68,12 +69,7 @@ export default function Dashboard() {
     }
     try {
       setLoading(true);
-      // Security fix: Filter by createdBy to only fetch user's own content
-      // This matches Firestore security rules that allow reading only own documents
-      const q = query(
-        collection(db, "content"),
-        where("createdBy", "==", currentUser.uid)
-      );
+      const q = query(collection(db, "content"),where("createdBy", "==", currentUser.uid)/*, orderBy("createdAt", "desc")*/);
       const querySnapshot = await getDocs(q);
       // Performance fix: Sort on client-side instead of orderBy in query
       // Avoids needing a composite index and reduces quota errors
@@ -248,6 +244,11 @@ export default function Dashboard() {
       <CreateContent
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={() => fetchContent(user)}
+      />
+      <CreateTemplate
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
         onSuccess={() => fetchContent(user)}
       />
 
