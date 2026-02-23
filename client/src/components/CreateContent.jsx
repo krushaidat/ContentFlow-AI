@@ -4,11 +4,13 @@ import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 import "./styles/createContent.css";
 
+// Aminah:
 // This component is used in the Dashboard.jsx file to create new content items. 
+// It includes a form with fields for title, text, and status, as well as a template selection feature that allows users to quickly populate the form with predefined structures for common content types.
 const CreateContent = ({ isOpen, onClose, onSuccess }) => {
   const CONTENT_TEMPLATES = [
     {
-      id: "Company Announcement",
+      id: "company-announcement",
       name: "Company Announcement",
       title: "Company Announcement: ",
       text: "Share company news and updates:\n\n• Key announcement:\n• Why it matters:\n• Call to action:",
@@ -16,7 +18,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
       modified: "Feb 5, 2026",
     },
     {
-      id: "Product Launch",
+      id: "new-product-launch",
       name: "New Product",
       title: "The Product: ",
       text: "Introduce your new product:\n\n• Key features:\n• Who will benefit:\n• Launch date & availability:",
@@ -40,14 +42,18 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
       modified: "Feb 2, 2026",
     },
   ];
+
+  // AMINAH:
+  // State variables for form fields, template selection, loading state, and error handling
   
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
-  const [status, setStatus] = useState("Draft");
+  const [stage, setStatus] = useState("Draft");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [showTemplates, setShowTemplates] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [templateSearch, setTemplateSearch] = useState(""); // AMINAH: State for template search
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -69,7 +75,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
       await addDoc(collection(db, "content"), {
         title: title.trim(),
         text: text.trim(),
-        status,
+        stage,
+        templateId: selectedTemplate || "new-product-launch",
         createdBy: user.uid,
         createdAt: new Date().toISOString(),
       });
@@ -77,6 +84,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
       setTitle("");
       setText("");
       setStatus("draft");
+      setSelectedTemplate("");
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
@@ -87,6 +95,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
+  // AMINAH:
   // Handle template selection and populate the form fields based on the selected template
   const handleTemplateSelect = (templateId) => {
     if (templateId === "") {
@@ -172,10 +181,10 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="status">Status</label>
+            <label htmlFor="stage">Stage</label>
             <select
-              id="status"
-              value={status}
+              id="stage"
+              value={stage}
               onChange={(e) => setStatus(e.target.value)}
               disabled={loading}
             >
@@ -211,31 +220,51 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         {showTemplates && (
           <div className="templates-overlay" onClick={() => setShowTemplates(false)}>
             <div className="templates-panel" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>Templates</h2>
+              <div className="modal-header templates-header">
+                <div className="templates-header-left">
+                  <span className="templates-header-icon">📄</span>
+                  <h2>Templates</h2>
+                  <span className="templates-header-desc">Manage and modify templates to ensure brand consistency.</span>
+                </div>
                 <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
               </div>
-              <div style={{ padding: 20 }}>
+              <div className="templates-search-row">
+                 {/* AMINAH: Search input for filtering templates */}
                 <input
+                  className="templates-search"
                   placeholder="Search templates..."
-                  style={{ width: "100%", padding: 10, borderRadius: 6, border: "1px solid #d1d5db", marginBottom: 16 }}
+                  value={templateSearch}
+                  onChange={e => setTemplateSearch(e.target.value)}
                 />
-
-                <div className="templates-grid">
-                  {CONTENT_TEMPLATES.map((t) => (
-                    <div key={t.id} className="template-card" onClick={() => handleTemplateSelect(t.id)}>
-                      <div className="template-icon">📄</div>
-                      <div className="template-body">
-                        <div className="template-title">{t.name}</div>
-                        <div className="template-desc">{t.description}</div>
-                        <div className="template-meta">Last modified {t.modified}</div>
+              </div>
+              <div className="templates-grid">
+                 {/* AMINAH: Show only filtered templates, or a message if none found */}
+                {CONTENT_TEMPLATES.filter(t =>
+                  t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                  t.description.toLowerCase().includes(templateSearch.toLowerCase())
+                ).length === 0 ? (
+                  <div style={{ padding: 24, color: '#6b7280', fontSize: 16 }}>No templates found.</div>
+                ) : (
+                  CONTENT_TEMPLATES.filter(t =>
+                    t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                    t.description.toLowerCase().includes(templateSearch.toLowerCase())
+                  ).map((t) => (
+                    <div key={t.id} className="template-card">
+                      <div className="template-card-icon">
+                         {/* AMINAH: Icon based on template type */}
+                        {t.id === "company-announcement" ? "📢" : t.id === "new-product-launch" ? "🛒" : t.id === "Product Update" ? "🎫" : "📄"}
                       </div>
-                      <div className="template-actions">
-                        <button className="btn-cancel" onClick={(e) => { e.stopPropagation(); setShowTemplates(false); handleTemplateSelect(t.id); }}>Use</button>
+                      <div className="template-card-body">
+                        <div className="template-card-title">{t.name}</div>
+                        <div className="template-card-desc">{t.description}</div>
+                        <div className="template-card-meta">Last modified {t.modified}</div>
+                      </div>
+                      <div className="template-card-actions">
+                        <button className="btn-template-select" onClick={() => { setShowTemplates(false); handleTemplateSelect(t.id); }}>Select</button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

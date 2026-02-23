@@ -1,27 +1,18 @@
-/**
- * ContentFlow AI - Backend API
- * Author: Abdalaa
-
- */
-
-require("dotenv").config();
-
+const db = require("./config/firebase");
 const express = require("express");
 const cors = require("cors");
-const { GoogleGenAI } = require("@google/genai");
+require("dotenv").config();
 
 const app = express();
 
-// Abdalaa: allow JSON bodies from the frontend
-app.use(express.json());
+// Middleware
+app.use(cors());
+app.use(express.json()); // Important for reading JSON body
 
-
-app.use(
-  cors({
-    origin: ["http://localhost:5173"],
-    credentials: true,
-  })
-);
+// Test route
+app.get("/", (req, res) => {
+  res.send("Server running");
+});
 
 const PORT = process.env.PORT || 5000;
 
@@ -123,6 +114,28 @@ Text: ${text}
   }
 });
 
+app.get("/api/templates", async (req, res) => {
+  try {
+    const snapshot = await db.collection("templates").get();
+
+    const templates = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    res.json(templates);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+
+// Routes
+const aiRoutes = require("./routes/aiRoutes");
+app.use("/api/ai", aiRoutes);
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
