@@ -240,11 +240,6 @@ export default function Dashboard() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => fetchContent(user)}
       />
-      <CreateTemplate
-        isOpen={showTemplatesModal}
-        onClose={() => setShowTemplatesModal(false)}
-        onSuccess={() => fetchContent(user)}
-      />
 
       {/* AMINAH: Templates Modal */}
       <ManageTemplates
