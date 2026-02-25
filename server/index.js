@@ -21,7 +21,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.AIzaSyBWJRwrY9N9C8zBs8XxcK_hicz
 
 // Quick health check route
 app.get("/api/test", (req, res) => {
-  res.json({ message: "Backend connected successfully" });
+  res.json({ message: "Backend connected successfully ✅" });
 });
 
 /**
@@ -138,4 +138,3 @@ app.use("/api/ai", aiRoutes);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
