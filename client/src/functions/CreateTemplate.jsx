@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { collection, addDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { db } from "../firebase";
+import { addTemplate } from "../functions/templateDB";
 
 const CreateTemplate = ({ isOpen, onClose, onSuccess }) => {
   const [title, setTitle] = useState("");
@@ -14,38 +13,31 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess }) => {
   const user = auth.currentUser;
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
+  e.preventDefault();
+  setError(null);
 
-    if (!user) {
-      setError("You must be logged in to create a template.");
-      return;
+  if (!title.trim() || !structure.trim()) {
+    setError("Please fill in all fields.");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const newId = await addTemplate(title, structure);
+
+    setSuccess(true);
+
+    if (onSuccess) {
+      onSuccess(newId);
     }
 
-    if (!title.trim() || !sections.trim() || !structure.trim()) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const templateRef = await addDoc(collection(db, "templates"), {
-        title,
-        sections,
-        structure,
-        createdBy: user.uid,
-        createdAt: new Date().toISOString(),
-      });
-      setSuccess(true);
-      onSuccess(templateRef.id);
-    } catch (err) {
-      console.error("Error creating template:", err);
-      setError("Failed to create template. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  } catch (err) {
+    console.error("Error creating template:", err);
+    setError("Failed to create template. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
   const handleClose = () => {
     setTitle("");
     setSections("");
