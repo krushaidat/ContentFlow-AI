@@ -4,6 +4,7 @@ import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy }
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
+import CreateTemplate from "../../functions/CreateTemplate";
 import "../styles/dashboard.css";
 import ManageTemplates from "../ManageTemplates";
 

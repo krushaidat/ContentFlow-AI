@@ -33,8 +33,7 @@ const STAGES = [
 ];
 
 /**
- * Small helper to assign badge colors based on stage.
- * Makes the UI feel more dynamic instead of flat.
+ * Abdalaa: helper for stage badge colors
  */
 const stageBadgeClass = (stage) => {
   switch (stage) {
@@ -56,10 +55,10 @@ const stageBadgeClass = (stage) => {
 };
 
 const Workflow = () => {
-  // Stage selected in dropdown
+  
   const [selectedStage, setSelectedStage] = useState("Draft");
 
-  // Content returned from Firestore
+ 
   const [items, setItems] = useState([]);
 
   // Selected template and content
@@ -73,6 +72,11 @@ const Workflow = () => {
   // UI states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ai state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiResult, setAiResult] = useState(null);
 
   /**
    * Fetch content from Firestore
@@ -171,6 +175,45 @@ const Workflow = () => {
     setShowValidationPanel(false);
   }, [selectedStage]);
 
+  /**
+    abdalaa:
+   calls the backend endpoint that talks to gemini
+   */
+  const runAiValidation = async () => {
+    if (!selectedItem) return;
+  
+    setAiLoading(true);
+    setAiError("");
+    setAiResult(null);
+  
+    try {
+      const payload = {
+        title: selectedItem.title,
+        text: selectedItem.text,
+        stage: selectedItem.status,
+      };
+  
+      const res = await fetch("/api/ai/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+  
+      //  if there is a error it shows it clearly
+      const data = await res.json().catch(() => null);
+  
+      if (!res.ok) {
+        throw new Error(data?.error || `Request failed (${res.status})`);
+      }
+  
+      setAiResult(data);
+    } catch (err) {
+      console.error("AI validate frontend error:", err);
+      setAiError(err.message || "Could not validate content.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
   return (
     <div className="workflow-bg">
       <div className="workflow-page modern">
@@ -183,7 +226,7 @@ const Workflow = () => {
             </p>
           </div>
 
-          {/* Custom styled dropdown */}
+          {/* Dropdown */}
           <div className="wf-stage-select">
             <span className="wf-label">Currently Viewing</span>
 
@@ -204,16 +247,14 @@ const Workflow = () => {
           </div>
         </div>
 
-        {/* Two-column layout */}
+        {/* 2-column layout */}
         <div className="wf-grid">
           {/* LEFT SIDE — Content List */}
           <section className="wf-card">
             <div className="wf-card-header">
               <div className="wf-card-title">
                 {selectedStage} Content
-                <span className={stageBadgeClass(selectedStage)}>
-                  {selectedStage}
-                </span>
+                <span className={stageBadgeClass(selectedStage)}>{selectedStage}</span>
               </div>
 
               <div className="wf-card-meta">
@@ -223,13 +264,14 @@ const Workflow = () => {
 
             <div className="wf-card-body">
               {error && <div className="wf-alert wf-alert-error">{error}</div>}
+              {error && <div className="wf-alert wf-alert-error">{error}</div>}
 
               {!loading && !error && items.length === 0 && (
                 <div className="wf-empty">
                   <div className="wf-empty-icon">🟣</div>
                   <div className="wf-empty-title">No content found</div>
                   <div className="wf-empty-sub">
-                    Try switching stages or create new content from Dashboard.
+                    Switch stages or create content from Dashboard.
                   </div>
                 </div>
               )}
@@ -255,6 +297,7 @@ const Workflow = () => {
                         </span>
                       </div>
 
+                      <div className="wf-item-text">{item.text}</div>
                       <div className="wf-item-text">{item.text}</div>
 
                       <div className="wf-item-footer">
