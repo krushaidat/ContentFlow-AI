@@ -62,7 +62,7 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess }) => {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Create New Template</h2>
-          <button className="modal-close" onClick={handleClose}>×</button>
+          <button className="modal-close" onClick={handleClose} aria-label="Close modal">×</button>
         </div>
 
         {success ? (
