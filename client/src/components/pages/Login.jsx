@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   signInWithEmailAndPassword,
@@ -14,11 +14,48 @@ import "../styles/login.css";
  * LOGIN PAGE COMPONENT (Updated by Tanvir)
   - Redesigned with modern two-column layout for better UI consistency with Signup page
   - Info panel positioned on left side, form on right side (opposite of Signup for variety)
-  - Features email verification check and password reset functionality remained tghe same
+  - Features email verification check and password reset functionality remained the same
+  - Password field now has eye icon show/hide toggle (replaces text button)
+  - Password requirement cards shown live as user types (matches Signup page behavior)
  */
+
+// Eye icon SVGs for show/hide password toggle
+const EyeIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
+const EyeOffIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+    <line x1="1" y1="1" x2="23" y2="23"/>
+  </svg>
+);
+
+// Inline live requirement row shown below the password field while typing
+function RequirementRow({ met, text }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: met ? '#22a06b' : '#999' }}>
+      <span style={{ fontSize: '14px' }}>{met ? '✓' : '○'}</span>
+      {text}
+    </div>
+  );
+}
+
+// Tooltip list item with live green/grey indicator
+function RequirementItem({ met, text }) {
+  return (
+    <li style={{ color: met ? '#22a06b' : '#444', marginBottom: '3px' }}>
+      {text}
+    </li>
+  );
+}
+
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
-  console.log("Rendering Login component");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -28,19 +65,43 @@ export default function Login({ onLogin }) {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState(null);
   const [forgotMessage, setForgotMessage] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
 
+  const tooltipRef = useRef(null);
+  const infoIconRef = useRef(null);
   const googleProvider = new GoogleAuthProvider();
 
-  // TANVIR: Handle Google sign-in with verification and token generation
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        tooltipRef.current &&
+        !tooltipRef.current.contains(e.target) &&
+        infoIconRef.current &&
+        !infoIconRef.current.contains(e.target)
+      ) {
+        setShowTooltip(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Live password requirement checks
+  const passwordChecks = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>_\-+=~`[\]\\;'/]/.test(password),
+  };
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
     setShowResendVerification(false);
-
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
       const user = userCredential.user;
-      //Google accounts are always verified, so we can skip the email verification check
       const idToken = await user.getIdToken();
       onLogin({ uid: user.uid, email: user.email, token: idToken });
     } catch (err) {
@@ -74,27 +135,19 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      //Check if email is verified
       if (!user.emailVerified) {
         setError("Email not verified. Please check your inbox.");
         setShowResendVerification(true);
-        setUnverifiedUser(user); //Store user for resending verification email
-        // Log out the unverified user immediately
+        setUnverifiedUser(user);
         await auth.signOut();
-        setError("Email not verified. Please check your inbox.");
         setLoading(false);
         return;
       }
-      //Email is verified, proceed with login
-      const idToken = await user.getIdToken();
 
+      const idToken = await user.getIdToken();
       onLogin({
         uid: user.uid,
         email: user.email,
@@ -103,7 +156,6 @@ export default function Login({ onLogin }) {
       });
     } catch (err) {
       let errorMessage = "Login failed. Please try again.";
-      // Handle specific Firebase errors
       if (err.code === "auth/user-not-found") {
         errorMessage = "No account found with this email.";
       } else if (err.code === "auth/wrong-password") {
@@ -113,21 +165,13 @@ export default function Login({ onLogin }) {
       } else if (err.code === "auth/user-disabled") {
         errorMessage = "This account has been disabled.";
       } else if (err.code === "auth/too-many-requests") {
-        errorMessage =
-          "Too many failed login attempts. Please try again later.";
+        errorMessage = "Too many failed login attempts. Please try again later.";
       }
-
       setError(errorMessage);
       console.error("Login error:", err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const [showPassword, setShowPassword] = useState(false);
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
   };
 
   const handleForgotPassword = async () => {
@@ -151,9 +195,7 @@ export default function Login({ onLogin }) {
       } else if (err.code === "auth/too-many-requests") {
         setForgotError("Too many requests. Please try again later.");
       } else {
-        setForgotError(
-          "Failed to send password reset email. Please try again.",
-        );
+        setForgotError("Failed to send password reset email. Please try again.");
       }
     } finally {
       setForgotLoading(false);
@@ -161,9 +203,8 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    // TANVIR: Modern auth container with reversed layout (info left, form right)
     <div className="login-container">
-      {/* Left side: Info panel with features and testimonial */}
+      {/* Left side: Info panel */}
       <div className="login-side-panel">
         <h2>Welcome Back to ContentFlow AI</h2>
         <ul className="features-list">
@@ -173,7 +214,6 @@ export default function Login({ onLogin }) {
           <li>Real-time collaboration</li>
           <li>Analytics dashboard</li>
         </ul>
-
         <div className="testimonial">
           <p>"ContentFlow AI helps us stay organized and efficient"</p>
           <small>- Content Manager</small>
@@ -188,6 +228,7 @@ export default function Login({ onLogin }) {
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
+          {/* Email */}
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
             <input
@@ -200,29 +241,136 @@ export default function Login({ onLogin }) {
             />
           </div>
 
+          {/* Password with info tooltip + eye icon toggle */}
           <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <div className="password-input-wrapper">
+            <label htmlFor="password" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Password
+              {/* Info icon */}
+              <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  ref={infoIconRef}
+                  onClick={() => setShowTooltip((prev) => !prev)}
+                  aria-label="Password requirements"
+                  style={{
+                    background: 'none',
+                    border: '1.5px solid #888',
+                    borderRadius: '50%',
+                    width: '17px',
+                    height: '17px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                    color: '#666',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    lineHeight: 1,
+                  }}
+                >
+                  i
+                </button>
+
+                {/* Tooltip card */}
+                {showTooltip && (
+                  <div
+                    ref={tooltipRef}
+                    style={{
+                      position: 'absolute',
+                      bottom: '130%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: '#fff',
+                      border: '1px solid #ddd',
+                      borderRadius: '10px',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.13)',
+                      padding: '14px 18px',
+                      minWidth: '230px',
+                      zIndex: 100,
+                      fontSize: '13px',
+                      color: '#222',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', marginBottom: '8px' }}>Passwords must contain:</div>
+                    <ul style={{ margin: 0, paddingLeft: '18px', listStyle: 'disc' }}>
+                      <RequirementItem met={passwordChecks.length} text="A minimum of 8 characters" />
+                      <RequirementItem met={passwordChecks.uppercase} text="At least 1 uppercase letter" />
+                      <RequirementItem met={passwordChecks.special} text="At least 1 special character" />
+                    </ul>
+                    {/* Tooltip arrow */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-8px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '8px solid transparent',
+                      borderRight: '8px solid transparent',
+                      borderTop: '8px solid #ddd',
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-7px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '7px solid transparent',
+                      borderRight: '7px solid transparent',
+                      borderTop: '7px solid #fff',
+                    }} />
+                  </div>
+                )}
+              </span>
+            </label>
+
+            {/* Password input with eye icon toggle */}
+            <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? "text" : "password"}
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="ContentFlow123!"
+                placeholder="Enter your password"
                 className={error ? "input-error" : ""}
+                style={{ paddingRight: '42px', width: '100%', boxSizing: 'border-box' }}
               />
-              {/* TANVIR: Toggle password visibility button */}
               <button
                 type="button"
-                onClick={togglePasswordVisibility}
-                className="toggle-password-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#888',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
             </div>
+
+            {/* Live requirement indicators shown while typing */}
+            {password.length > 0 && (
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <RequirementRow met={passwordChecks.length} text="At least 8 characters" />
+                <RequirementRow met={passwordChecks.uppercase} text="At least 1 uppercase letter" />
+                <RequirementRow met={passwordChecks.special} text="At least 1 special character" />
+              </div>
+            )}
           </div>
 
-          {/* TANVIR: Error messages with option to resend verification email */}
+          {/* Error messages with option to resend verification email */}
           {error && (
             <div className="error-message">
               {error}
@@ -240,7 +388,7 @@ export default function Login({ onLogin }) {
             </div>
           )}
 
-          {/* TANVIR: Forgot password link with error/success messages */}
+          {/* Forgot password */}
           <div className="forgot-row">
             <button
               type="button"
@@ -252,9 +400,7 @@ export default function Login({ onLogin }) {
             </button>
           </div>
           {forgotError && <div className="error-message">{forgotError}</div>}
-          {forgotMessage && (
-            <div className="success-message">{forgotMessage}</div>
-          )}
+          {forgotMessage && <div className="success-message">{forgotMessage}</div>}
 
           <button type="submit" className="auth-button" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
@@ -270,29 +416,11 @@ export default function Login({ onLogin }) {
             onClick={handleGoogleSignIn}
             disabled={loading}
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                fill="#4285F4"
-              />
-              <path
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                fill="#34A853"
-              />
-              <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                fill="#EA4335"
-              />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
             Sign in with Google
           </button>
