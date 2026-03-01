@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { collection, addDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
+import { fetchTemplates } from "../functions/templateDB";
 import "./styles/createContent.css";
 
 // Aminah:
@@ -54,8 +55,50 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [templateSearch, setTemplateSearch] = useState(""); // AMINAH: State for template search
+  const [savedTemplates, setSavedTemplates] = useState([]);
   const auth = getAuth();
   const user = auth.currentUser;
+
+  // AMINAH: When the form is submitted, we validate the input and then send a request to the backend to create a new content item in Firestore. 
+  // The prompt for Gemini includes the title, stage, and text of the content, which can be used for validation or enhancement on the backend. 
+  // We also handle loading state and errors to provide feedback to the user.
+  const allTemplates = [
+  ...savedTemplates,
+  ...CONTENT_TEMPLATES
+  ].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+
+  const filteredTemplates = allTemplates.filter((t) =>
+    t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+    t.description.toLowerCase().includes(templateSearch.toLowerCase())
+  );
+
+  // AMINAH: Compute the name of the selected template to display in the UI
+  const selectedTemplateName = allTemplates.find((t) => t.id === selectedTemplate)?.name;
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+// AMINAH: Load saved templates from Firestore when the modal is opened, and combine them with the predefined templates. 
+// This allows users to manage their own custom templates in addition to the common structures we provide.
+    const loadSavedTemplates = async () => {
+      try {
+        const templates = await fetchTemplates();
+        const mappedTemplates = templates.map((template) => ({
+          id: template.id,
+          name: template.title || "Untitled Template",
+          title: template.title ? `${template.title}: ` : "",
+          text: template.content || "",
+          description: template.content || "Saved custom template",
+          modified: "Saved template",
+        }));
+        setSavedTemplates(mappedTemplates);
+      } catch (fetchError) {
+        console.error("Failed to load saved templates:", fetchError);
+      }
+    };
+
+    loadSavedTemplates();
+  }, [isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -107,7 +150,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
       return;
     }
 
-    const template = CONTENT_TEMPLATES.find((t) => t.id === templateId);
+    const template = allTemplates.find((t) => t.id === templateId);
     if (!template) return;
 
     setSelectedTemplate(templateId);
@@ -152,7 +195,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
                 Select Template
               </button>
               <div style={{ fontSize: 14, color: "#374151" }}>
-                {selectedTemplate ? `Selected: ${selectedTemplate}` : "Blank Content"}
+                {/* AMINAH: Show the name of the selected template or indicate that it's blank content */}
+                {selectedTemplateName ? `Selected: ${selectedTemplateName}` : "Blank Content"}
               </div>
             </div>
           </div>
@@ -239,16 +283,10 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
               </div>
               <div className="templates-grid">
                  {/* AMINAH: Show only filtered templates, or a message if none found */}
-                {CONTENT_TEMPLATES.filter(t =>
-                  t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
-                  t.description.toLowerCase().includes(templateSearch.toLowerCase())
-                ).length === 0 ? (
+                {filteredTemplates.length === 0 ? (
                   <div style={{ padding: 24, color: '#6b7280', fontSize: 16 }}>No templates found.</div>
                 ) : (
-                  CONTENT_TEMPLATES.filter(t =>
-                    t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
-                    t.description.toLowerCase().includes(templateSearch.toLowerCase())
-                  ).map((t) => (
+                  filteredTemplates.map((t) => (
                     <div key={t.id} className="template-card">
                       <div className="template-card-icon">
                          {/* AMINAH: Icon based on template type */}

@@ -76,37 +76,37 @@ useEffect(() => {
           </button>
         </div>
       </div>
-
-        <div className="templates-search-row">
+        <div className= "modal-scroll">
+        <div className="manage-templates-search-row">
           <input
-            className="templates-search"
+            className="manage-templates-search"
             placeholder="Search templates..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        <div className="templates-list">
+        <div className="manage-templates-list">
           {filteredTemplates.length === 0 ? (
             <div style={{ padding: 24, color: "#6b7280" }}>
               No templates found.
             </div>
           ) : (
             filteredTemplates.map((template) => (
-              <div key={template.id} className="template-card">
-                <div className="template-card-icon">
+              <div key={template.id} className="manage-template-card">
+                <div className="manage-template-card-icon">
                 </div>
 
-                <div className="template-card-body">
-                  <div className="template-card-title">
+                <div className="manage-template-card-body">
+                  <div className="manage-template-card-title">
                     {template.title}
                   </div>
-                  <div className="template-card-desc">
+                  <div className="manage-template-card-desc">
                     {template.content}
                   </div>
                 </div>
 
-                <div className="template-card-actions">
+                <div className="manage-template-card-actions">
                   <button onClick={() => handleEdit(template.id)}>
                     Edit
                   </button>
@@ -119,6 +119,7 @@ useEffect(() => {
           )}
         </div>
       </div>
+    </div>
     </div>
    <CreateTemplate
       isOpen={isCreateOpen}
