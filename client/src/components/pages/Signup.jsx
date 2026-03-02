@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase';
 import '../styles/Signup.css';
+import Login from "../pages/Login";
+import {AiOutlineEye, AiOutlineEyeInvisible} from 'react-icons/ai'
 
 /**
  * SIGNUP PAGE COMPONENT (Updated by Tanvir)
@@ -128,7 +130,8 @@ function Signup() {
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-
+    
+    
     return newErrors;
   };
 
@@ -162,6 +165,7 @@ function Signup() {
         password: '',
         confirmPassword: ''
       });
+
       setErrors({});
 
       alert('Account created successfully! Please check your email to verify your account before logging in.');
@@ -181,6 +185,7 @@ function Signup() {
       setIsLoading(false);
     }
   };
+
 
   // All password requirements met for both fields
   const confirmPasswordChecks = {

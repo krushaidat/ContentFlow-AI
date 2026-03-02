@@ -4,43 +4,56 @@ import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 import "./styles/createContent.css";
 
+// Aminah:
 // This component is used in the Dashboard.jsx file to create new content items. 
+// It includes a form with fields for title, text, and status, as well as a template selection feature that allows users to quickly populate the form with predefined structures for common content types.
 const CreateContent = ({ isOpen, onClose, onSuccess }) => {
   const CONTENT_TEMPLATES = [
-    // It includes a modal form with fields for title, text, and status, as well as a dropdown to select from predefined content templates.
     {
-
       id: "company-announcement",
       name: "Company Announcement",
       title: "Company Announcement: ",
       text: "Share company news and updates:\n\n• Key announcement:\n• Why it matters:\n• Call to action:",
+      description: "Structure for announcing company news",
+      modified: "Feb 5, 2026",
     },
     {
       id: "new-product-launch",
       name: "New Product",
       title: "The Product: ",
       text: "Introduce your new product:\n\n• Key features:\n• Who will benefit:\n• Launch date & availability:",
+      description: "Structure for detailing new product launches",
+      modified: "Feb 4, 2026",
     },
     {
-      id: "product-update",
-      name: "Product Update",
-      title: "The ProductUpdate: ",
-      text: " What’s new?\n\n• Feature update:\n• Who it helps:\n• How to get started:",
-    },
-    {
-      id: "event-promotion",
+      id: "Product Update",
       name: "Event Promotion",
       title: "Join Us: ",
       text: " Event details\n\n• Date:\n• Time:\n• What you’ll learn:\n• Register link:",
+      description: "Structure for promoting upcoming webinars, workshops, or events",
+      modified: "Feb 3, 2026",
+    },
+    {
+      id: "Newsletter",
+      name: "Weekly Newsletter",
+      title: "Weekly Newsletter: ",
+      text: "Outline for curating weekly newsletter content:\n\n• Top story:\n• Highlights:\n• Links & CTAs:",
+      description: "Outline for curating weekly newsletter content",
+      modified: "Feb 2, 2026",
     },
   ];
+
+  // AMINAH:
+  // State variables for form fields, template selection, loading state, and error handling
   
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [stage, setStatus] = useState("Draft");
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [templateSearch, setTemplateSearch] = useState(""); // AMINAH: State for template search
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -82,12 +95,14 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
+  // AMINAH:
   // Handle template selection and populate the form fields based on the selected template
   const handleTemplateSelect = (templateId) => {
     if (templateId === "") {
       // Blank content - clear the fields
       setSelectedTemplate("");
       setTitle("");
+      setShowTemplates(false);
       setText("");
       return;
     }
@@ -98,6 +113,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     setSelectedTemplate(templateId);
     setTitle(template.title);
     setText(template.text);
+    setShowTemplates(false);
   };
 
   // Handle closing the modal and resetting the form
@@ -113,6 +129,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
+  // AMINAH: added template selection UI and integrated it with the form fields to allow users to quickly populate content based on common structures. 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -123,20 +140,21 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
 
         <form onSubmit={handleSubmit} className="create-content-form">
           <div className="form-group">
-            <label htmlFor="template">Start from a Template</label>
-            <select
-              id="template"
-              value={selectedTemplate}
-              onChange={(e) => handleTemplateSelect(e.target.value)}
-              disabled={loading}
-            >
-              <option value="">Blank Content</option>
-              {CONTENT_TEMPLATES.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
+            <label>Start from a Template</label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                type="button"
+                className="btn-submit"
+                onClick={() => setShowTemplates(true)}
+                disabled={loading}
+                style={{ padding: "8px 12px", fontSize: 14 }}
+              >
+                Select Template
+              </button>
+              <div style={{ fontSize: 14, color: "#374151" }}>
+                {selectedTemplate ? `Selected: ${selectedTemplate}` : "Blank Content"}
+              </div>
+            </div>
           </div>
           <div className="form-group">
             <label htmlFor="title">Title</label>
@@ -198,6 +216,59 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
             </button>
           </div>
         </form>
+
+        {showTemplates && (
+          <div className="templates-overlay" onClick={() => setShowTemplates(false)}>
+            <div className="templates-panel" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header templates-header">
+                <div className="templates-header-left">
+                  <span className="templates-header-icon">📄</span>
+                  <h2>Templates</h2>
+                  <span className="templates-header-desc">Manage and modify templates to ensure brand consistency.</span>
+                </div>
+                <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
+              </div>
+              <div className="templates-search-row">
+                 {/* AMINAH: Search input for filtering templates */}
+                <input
+                  className="templates-search"
+                  placeholder="Search templates..."
+                  value={templateSearch}
+                  onChange={e => setTemplateSearch(e.target.value)}
+                />
+              </div>
+              <div className="templates-grid">
+                 {/* AMINAH: Show only filtered templates, or a message if none found */}
+                {CONTENT_TEMPLATES.filter(t =>
+                  t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                  t.description.toLowerCase().includes(templateSearch.toLowerCase())
+                ).length === 0 ? (
+                  <div style={{ padding: 24, color: '#6b7280', fontSize: 16 }}>No templates found.</div>
+                ) : (
+                  CONTENT_TEMPLATES.filter(t =>
+                    t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                    t.description.toLowerCase().includes(templateSearch.toLowerCase())
+                  ).map((t) => (
+                    <div key={t.id} className="template-card">
+                      <div className="template-card-icon">
+                         {/* AMINAH: Icon based on template type */}
+                        {t.id === "company-announcement" ? "📢" : t.id === "new-product-launch" ? "🛒" : t.id === "Product Update" ? "🎫" : "📄"}
+                      </div>
+                      <div className="template-card-body">
+                        <div className="template-card-title">{t.name}</div>
+                        <div className="template-card-desc">{t.description}</div>
+                        <div className="template-card-meta">Last modified {t.modified}</div>
+                      </div>
+                      <div className="template-card-actions">
+                        <button className="btn-template-select" onClick={() => { setShowTemplates(false); handleTemplateSelect(t.id); }}>Select</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

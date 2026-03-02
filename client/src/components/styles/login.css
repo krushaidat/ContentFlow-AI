@@ -179,7 +179,7 @@
   padding-right: 3.5rem;
 }
 
-.toggle-password-btn {
+.eye-icon-btn {
   position: absolute;
   right: 0.75rem;
   top: 50%;
@@ -187,7 +187,7 @@
   background: transparent;
   border: none;
   color: #667eea;
-  font-size: 0.9rem;
+  font-size: 1.25rem;
   cursor: pointer;
   padding: 0.5rem;
   font-weight: 500;

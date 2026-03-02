@@ -1,10 +1,13 @@
-const admin = require("firebase-admin");
-const serviceAccount = require("../serviceAccountKey.json");
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+const firebaseConfig = {
+  apiKey: "AIzaSyDNYV8rYI9D6SY9HIvXvXrWSysALDrp_ak",
+  authDomain: "contentflow-ai-80993.firebaseapp.com",
+  projectId: "contentflow-ai-80993",
+};
 
-const db = admin.firestore();
-
-module.exports = db;
+const app = initializeApp(firebaseConfig); 
+export const auth = getAuth(app);
+export const db = getFirestore(app);
