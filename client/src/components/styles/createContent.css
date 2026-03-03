@@ -110,7 +110,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(231, 231, 231, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -198,9 +198,11 @@
 .form-group textarea,
 .form-group select {
   padding: 12px;
-  border: 1px solid #d1d5db;
+  background-color: #ebe3f5;
+  color: black;
+  border: 1px solid #d3d1db;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 16px;
   font-family: inherit;
   transition: border-color 0.2s, box-shadow 0.2s;
 }

@@ -173,7 +173,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(240, 238, 238, 0);
   z-index: 1000;
   overflow-y: auto;
 }
