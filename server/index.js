@@ -14,14 +14,12 @@ app.get("/", (req, res) => {
   res.send("Server running");
 });
 
-const PORT = process.env.PORT || 5000;
-
 // Abdalaa: Create the Gemini client using the key in server/.env
 const ai = new GoogleGenAI({ apiKey: process.env.AIzaSyBWJRwrY9N9C8zBs8XxcK_hiczt0amajdc });
 
 // Quick health check route
 app.get("/api/test", (req, res) => {
-  res.json({ message: "Backend connected successfully ✅" });
+  res.json({ message: "Backend connected successfully" });
 });
 
 /**
