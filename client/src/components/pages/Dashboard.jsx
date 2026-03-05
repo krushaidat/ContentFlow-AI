@@ -69,7 +69,12 @@ export default function Dashboard() {
     }
     try {
       setLoading(true);
-      const q = query(collection(db, "content"),where("createdBy", "==", currentUser.uid)/*, orderBy("createdAt", "desc")*/);
+      // Security fix: Filter by createdBy to only fetch user's own content
+      // This matches Firestore security rules that allow reading only own documents
+      const q = query(
+        collection(db, "content"),
+        where("createdBy", "==", currentUser.uid)
+      );
       const querySnapshot = await getDocs(q);
       // Performance fix: Sort on client-side instead of orderBy in query
       // Avoids needing a composite index and reduces quota errors

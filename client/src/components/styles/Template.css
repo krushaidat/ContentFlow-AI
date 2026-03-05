@@ -5,70 +5,80 @@
 	border-radius: 18px;
 	box-shadow: 0 8px 32px rgba(80, 60, 180, 0.12);
 	padding: 0;
-	max-width: 600px;
+	
+	width: 700px;
+	height: 800px;
+	max-height: 80vh;
 	margin: 60px auto;
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
 }
 /* Template Card Styles */
-.template-card {
+.manage-template-card {
 	display: flex;
+	flex-direction: row;
 	align-items: center;
+	justify-content: flex-start;
 	background: #f7f6ff;
 	border-radius: 16px;
 	box-shadow: 0 2px 8px rgba(80, 60, 180, 0.08);
-	padding: 24px 20px;
-	margin-bottom: 18px;
+	padding: 28px 24px;
+	margin-bottom: 20px;
 	transition: box-shadow 0.2s;
 	position: relative;
 }
 
-.template-card:hover {
+.manage-template-card:hover {
 	box-shadow: 0 4px 16px rgba(80, 60, 180, 0.16);
 }
 
-.template-card-icon {
-	width: 48px;
-	height: 48px;
+.manage-template-card-icon {
+	order: 0;
+	width: 58px;
+	height: 58px;
+	min-width: 58px;
 	background: #ece8ff;
 	border-radius: 12px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 28px;
-	margin-right: 20px;
+	font-size: 30px;
+	margin-left: 0;
+	margin-right: 22px;
 }
 
-.template-card-body {
+.manage-template-card-body {
+	order: 1;
 	flex: 1;
 }
 
-.template-card-title {
-	font-size: 1.1rem;
+.manage-template-card-title {
+	font-size: 1.2rem;
 	font-weight: 600;
 	color: #3a2d7d;
-	margin-bottom: 4px;
-}
-
-.template-card-desc {
-	font-size: 1rem;
-	color: #6a5ca8;
 	margin-bottom: 6px;
 }
 
-.template-card-meta {
+.manage-template-card-desc {
+	font-size: 1.05rem;
+	color: #6a5ca8;
+	margin-bottom: 8px;
+}
+
+.manage-template-card-meta {
 	font-size: 0.95rem;
 	color: #a09ad6;
 }
 
-.template-card-actions {
+.manage-template-card-actions {
+	order: 2;
 	display: flex;
 	gap: 12px;
-	margin-left: 16px;
+	margin-left: auto;
 }
 
-.template-card-actions button {
+.manage-template-card-actions button {
 	background: none;
 	border: none;
 	color: #6a5ca8;
@@ -79,11 +89,11 @@
 	transition: background 0.2s;
 }
 
-.template-card-actions button:hover {
+.manage-template-card-actions button:hover {
 	background: #ece8ff;
 }
 
-.template-card-date {
+.manage-template-card-date {
 	font-size: 0.95rem;
 	color: #a09ad6;
 	position: absolute;
@@ -91,63 +101,70 @@
 	top: 24px;
 }
 /* Template Modal Styles */
-.template-modal-card {
+.manage-template-modal-card {
 	display: flex;
+	flex-direction: row;
 	align-items: center;
+	justify-content: flex-start;
 	background: #f7f6ff;
 	border-radius: 16px;
 	box-shadow: 0 2px 8px rgba(80, 60, 180, 0.08);
-	padding: 24px 20px;
-	margin-bottom: 18px;
+	padding: 28px 24px;
+	margin-bottom: 20px;
 	transition: box-shadow 0.2s;
 	position: relative;
 }
 
-.template-modal-card:hover {
-	box-shadow: 0 4px 16px rgba(80, 60, 180, 0.16);
+.manage-template-modal-card:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 8px 22px rgba(80, 60, 180, 0.14);
 }
-
-.template-modal-icon {
-	width: 48px;
-	height: 48px;
+.manage-template-modal-icon {
+	order: 0;
+	width: 54px;
+	height: 54px;
+	min-width: 54px;
 	background: #ece8ff;
 	border-radius: 12px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 28px;
-	margin-right: 20px;
+	font-size: 30px;
+	margin-left: 0;
+	margin-right: 22px;
 }
 
-.template-modal-body {
+.manage-template-modal-body {
+	order: 1;
 	flex: 1;
 }
 
-.template-modal-title {
-	font-size: 1.1rem;
+.manage-template-modal-title {
+	font-size: 1.2rem;
 	font-weight: 600;
 	color: #3a2d7d;
-	margin-bottom: 4px;
-}
-
-.template-modal-desc {
-	font-size: 1rem;
-	color: #6a5ca8;
 	margin-bottom: 6px;
 }
 
-.template-modal-meta {
+.manage-template-modal-desc {
+	font-size: 1.05rem;
+	color: #6a5ca8;
+	margin-bottom: 8px;
+}
+
+.manage-template-modal-meta {
 	font-size: 0.95rem;
 	color: #a09ad6;
 }
 
-.template-modal-actions {
+.manage-template-modal-actions {
+	order: 2;
 	display: flex;
 	gap: 12px;
-	margin-left: 16px;
+	margin-left: auto;
 }
 
-.template-modal-actions button {
+.manage-template-modal-actions button {
 	background: none;
 	border: none;
 	color: #6a5ca8;
@@ -158,11 +175,11 @@
 	transition: background 0.2s;
 }
 
-.template-modal-actions button:hover {
+.manage-template-modal-actions button:hover {
 	background: #ece8ff;
 }
 
-.template-modal-date {
+.manage-template-modal-date {
 	font-size: 0.95rem;
 	color: #a09ad6;
 	position: absolute;
@@ -170,6 +187,28 @@
 	top: 24px;
 }
 
+.modal-scroll {
+	flex: 1;
+	overflow-y: auto;
+	padding: 20px;
+}
+
+.manage-templates-search-row {
+  padding: 0 24px 16px 24px;
+}
+
+.manage-templates-search-row input {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.manage-template-search {
+  position: absolute;
+  right: 24px;
+  top: 24px;
 .modal-overlay {
   position: fixed;
   inset: 0;

@@ -223,6 +223,7 @@ const Workflow = () => {
 
             <div className="wf-card-body">
               {error && <div className="wf-alert wf-alert-error">{error}</div>}
+              {error && <div className="wf-alert wf-alert-error">{error}</div>}
 
               {!loading && !error && items.length === 0 && (
                 <div className="wf-empty">
@@ -255,6 +256,7 @@ const Workflow = () => {
                         </span>
                       </div>
 
+                      <div className="wf-item-text">{item.text}</div>
                       <div className="wf-item-text">{item.text}</div>
 
                       <div className="wf-item-footer">

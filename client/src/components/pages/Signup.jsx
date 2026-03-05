@@ -34,6 +34,18 @@ function Signup() {
   const infoIconRef = useRef(null);
   const googleProvider = new GoogleAuthProvider();
 
+  // State for toggling visibility of password fields
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword((prev) => !prev);
+  };
+  
   // Close tooltip when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {

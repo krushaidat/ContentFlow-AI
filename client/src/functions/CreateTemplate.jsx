@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { db } from "../firebase";
+import { addTemplate } from "../functions/templateDB";
 
 const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
   const [title, setTitle] = useState(existingTemplate?.title || "");
@@ -28,13 +28,13 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
 
   /**DRAVEN: Handle form submission for creating or updating a template */
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
+  e.preventDefault();
+  setError(null);
 
-    if (!user) {
-      setError("You must be logged in to create a template.");
-      return;
-    }
+  if (!title.trim() || !structure.trim()) {
+    setError("Please fill in all fields.");
+    return;
+  }
 
     if (!title.trim() || !requiredSections.trim() || !structure.trim()) {
       setError("Please fill in all fields.");
@@ -65,6 +65,13 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
   }
 };
 
+  } catch (err) {
+    console.error("Error creating template:", err);
+    setError("Failed to create template. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
   const handleClose = () => {
     setTitle("");
     setRequiredSections("");
@@ -81,7 +88,7 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Create New Template</h2>
-          <button className="modal-close" onClick={handleClose}>×</button>
+          <button className="modal-close" onClick={handleClose} aria-label="Close modal">×</button>
         </div>
 
         {success ? (
