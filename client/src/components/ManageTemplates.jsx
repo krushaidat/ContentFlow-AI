@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
+import { db } from "../firebase"; 
 import "./styles/template.css";
 import { useEffect } from "react";
 import { fetchTemplates, deleteTemplate } from "../functions/templateDB";
@@ -31,20 +34,36 @@ useEffect(() => {
 
   
 
+    fetchTemplates();
+  }, []);
   // Aminah: I added a search state to manage the search input for filtering templates. The filteredTemplates variable computes the list of templates that match the search query based on their name or description. The handleEdit and handleDelete functions are stubs for editing and deleting templates, which can be expanded with actual functionality later.
   const [search, setSearch] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
 
   if (!isOpen) return null;
 
   const filteredTemplates = templates.filter(
-  (t) =>
-    t.title?.toLowerCase().includes(search.toLowerCase()) ||
-    t.content?.toLowerCase().includes(search.toLowerCase())
-);
-
+    (t) =>
+      t.title?.toLowerCase().includes(search.toLowerCase()) ||
+      t.sections?.toLowerCase().includes(search.toLowerCase())
+  );
 
   // Aminah: The handleEdit function currently just shows an alert with the template ID, but in a real application, it would likely open an edit form or navigate to an edit page. The handleDelete function updates the templates state by filtering out the deleted template based on its ID.
-  const handleEdit = (id) => alert(`Edit template ${id}`);
+  // DRAVEN: Opens the CreateTemplate modal with the selected template's data for editing. The onSuccess callback is used to refresh the template list after a template is created or updated. The existingTemplate prop is passed to pre-fill the form when editing an existing template.
+  const handleEdit = (template) => {
+    setEditingTemplate(template);
+    setShowCreateModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteDoc(doc(db, "templates", id));
+      setTemplates(templates.filter((t) => t.id !== id));
+    } catch (error) {
+      console.error("Error deleting template: ", error);
+    }
+  };
 
   const handleDelete = async (id) => {
   try {
@@ -84,6 +103,13 @@ useEffect(() => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <button
+            className="dashboard-card-btn"
+            onClick={() => setShowCreateModal(true)}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            + Add Template
+          </button>
         </div>
 
         <div className="manage-templates-list">
