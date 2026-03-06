@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -17,34 +17,22 @@ const ReviewPage = () => {
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchAssignedContent = useCallback(async () => {
+    if (!user?.uid) return;
 
-    if (user?.role === 'reviewer' && user?.uid) {
-      fetchAssignedContent();
-    } else {
-      setLoading(false);
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
-
-  const fetchAssignedContent = async () => {
     try {
       setLoading(true);
       const q = query(
         collection(db, 'content'),
         where('reviewerId', '==', user.uid)
       );
-      
+
       const querySnapshot = await getDocs(q);
       const items = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      
+
       setAssignedItems(items);
       setError(null);
     } catch (err) {
@@ -53,7 +41,15 @@ const ReviewPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (user?.role === 'reviewer' && user?.uid) {
+      fetchAssignedContent();
+    } else {
+      setLoading(false);
+    }
+  }, [user?.role, user?.uid, fetchAssignedContent]);
 
   const handleView = (item) => {
     setViewingItem(item);
@@ -83,12 +79,6 @@ const ReviewPage = () => {
     } finally {
       setUpdatingId(null);
     }
-  };
-
-  const handleRejectClick = (itemId) => {
-    setSelectedItemId(itemId);
-    setRejectReason('');
-    setShowRejectModal(true);
   };
 
   const handleRejectSubmit = async () => {

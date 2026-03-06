@@ -16,10 +16,12 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   limit,
+  updateDoc,
+  doc,
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
+import { assignReviewerWithGemini, getAvailableReviewers } from "../../utils/geminiReviewerAssignment";
 import "../styles/workflow.css";
 
 // These stages must match exactly what we store in Firestore
@@ -149,17 +151,45 @@ const Workflow = () => {
 
       const data = await res.json();
       if (data.success) {
-        setValidationResult(data.validation);
-        setShowValidationPanel(true);
-      } else {
-        alert("Validation failed: " + data.error);
+      setValidationResult(data.validation);
+      setShowValidationPanel(true);
+
+      // Auto-move to Review and auto-assign reviewer when validation passes
+      if (data.validation?.compliance) {
+        const reviewers = await getAvailableReviewers(db, collection, query, getDocs);
+        const assignedReviewerId = await assignReviewerWithGemini(selectedContent, reviewers);
+
+        const updatePayload = {
+          stage: "Review",
+          validation: data.validation,
+          validatedAt: new Date().toISOString(),
+        };
+
+        if (assignedReviewerId) {
+          updatePayload.reviewerId = assignedReviewerId;
+          updatePayload.assignedAt = new Date().toISOString();
+        }
+
+        await updateDoc(doc(db, "content", selectedContent.id), updatePayload);
+
+        setSelectedContent((prev) => (prev ? { ...prev, ...updatePayload } : prev));
+        await fetchContent();
+
+        if (assignedReviewerId) {
+          alert("Validation passed. Stage updated to Review and reviewer assigned.");
+        } else {
+          alert("Validation passed. Stage updated to Review, but no reviewer could be assigned.");
+        }
       }
-    } catch (err) {
-      console.error("Validation error:", err);
-      alert("Error validating content");
-    } finally {
-      setLoading(false);
+    } else {
+      alert("Validation failed: " + data.error);
     }
+  } catch (err) {
+    console.error("Validation error:", err);
+    alert("Error validating content");
+  } finally {
+    setLoading(false);
+  }
   };
 
   /**
