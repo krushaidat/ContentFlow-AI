@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { addTemplate } from "../functions/templateDB";
+import { db } from "../firebase";
 
 const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
   const [title, setTitle] = useState(existingTemplate?.title || "");
@@ -11,9 +11,8 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const auth = getAuth();
-  const user = auth.currentUser;
 
-  /** DRAVEN: Fetch existing template data if editing. If creating fields are null*/
+  /** DRAVEN: Fetch existing template data if editing. If creating, fields are reset to empty. */
   useEffect(() => {
     if (existingTemplate) {
       setTitle(existingTemplate.title || "");
@@ -26,15 +25,10 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
     }
   }, [existingTemplate]);
 
-  /**DRAVEN: Handle form submission for creating or updating a template */
+  /** DRAVEN: Handle form submission for creating or updating a template */
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError(null);
-
-  if (!title.trim() || !structure.trim()) {
-    setError("Please fill in all fields.");
-    return;
-  }
+    e.preventDefault();
+    setError(null);
 
     if (!title.trim() || !requiredSections.trim() || !structure.trim()) {
       setError("Please fill in all fields.");
@@ -43,35 +37,32 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
 
     setLoading(true);
     try {
-    if (existingTemplate) {
-      await updateDoc(doc(db, "templates", existingTemplate.id), {
-        title,
-        requiredSections,
-        structure,
-        lastModified: new Date().toLocaleDateString(),
-      });
-    } else {
-      await addDoc(collection(db, "templates"), {
-        title,
-        requiredSections,
-        structure,
-        lastModified: new Date().toLocaleDateString(),
-        createdBy: auth.currentUser.uid,
-      });
+      if (existingTemplate) {
+        await updateDoc(doc(db, "templates", existingTemplate.id), {
+          title,
+          requiredSections,
+          structure,
+          lastModified: new Date().toLocaleDateString(),
+        });
+      } else {
+        await addDoc(collection(db, "templates"), {
+          title,
+          requiredSections,
+          structure,
+          lastModified: new Date().toLocaleDateString(),
+          createdBy: auth.currentUser.uid,
+        });
+      }
+      setSuccess(true);
+      onSuccess();
+    } catch (err) {
+      console.error("Error saving template:", err);
+      setError("Failed to save template. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    onSuccess();
-  } catch (error) {
-    console.error("Error saving template:", error);
-  }
-};
+  };
 
-  } catch (err) {
-    console.error("Error creating template:", err);
-    setError("Failed to create template. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
   const handleClose = () => {
     setTitle("");
     setRequiredSections("");
@@ -87,7 +78,7 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Create New Template</h2>
+          <h2>{existingTemplate ? "Edit Template" : "Create New Template"}</h2>
           <button className="modal-close" onClick={handleClose} aria-label="Close modal">×</button>
         </div>
 
@@ -156,8 +147,9 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess, existingTemplate }) => {
                 className="btn-submit"
                 disabled={loading}
               >
-                {loading ? (existingTemplate ? "Saving..." : "Creating...") 
-                : (existingTemplate ? "Save Changes" : "Create Template")}
+                {loading
+                  ? (existingTemplate ? "Saving..." : "Creating...")
+                  : (existingTemplate ? "Save Changes" : "Create Template")}
               </button>
             </div>
           </form>

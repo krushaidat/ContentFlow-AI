@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -13,6 +13,7 @@ import Dashboard from "./components/pages/Dashboard";
 import Workflow from "./components/pages/Workflow";
 import Login from "./components/pages/Login";
 import Signup from "./components/pages/Signup";
+import ReviewPage from "./components/pages/Review";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -101,6 +102,17 @@ function App() {
                   displayName={displayName}
                 >
                   <Workflow />
+                </Layout>
+              }
+            />
+            <Route
+              path="/review"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <ReviewPage />
                 </Layout>
               }
             />

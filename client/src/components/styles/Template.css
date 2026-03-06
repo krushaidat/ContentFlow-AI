@@ -209,6 +209,8 @@
   position: absolute;
   right: 24px;
   top: 24px;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

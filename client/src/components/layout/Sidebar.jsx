@@ -7,18 +7,20 @@ import projectsIcon from "../../assets/projects.png";
 import toolsIcon from "../../assets/tools.png";
 import settingIcon from "../../assets/setting.png";
 import helpIcon from "../../assets/help.png";
+import { useAuth } from "../../hooks/useAuth.js"; 
 
 const routes = [
   { key: "dashboard", label: "Dashboard", path: "/dashboard" },
   { key: "workflow", label: "Workflow", path: "/workflow" },
   { key: "documents", label: "AI Tools", path: "/aitools" },
-  { key: "review", label: "Projects", path: "/projects" }
+  { key: "review", label: "Review", path: "/review", reviewerOnly: true }
 ];
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const { user } = useAuth(); // <-- Get user
+
   const getActiveKey = () => {
     const path = location.pathname;
     return routes.find(r => r.path === path)?.key || "dashboard";
@@ -41,25 +43,27 @@ const Sidebar = () => {
       </div>
 
       <nav className="sidebar-nav">
-        {routes.map((r) => {
-          const labelKey = r.label.toLowerCase();
-          let icon = null;
-          if (labelKey.includes("dash")) icon = dashboardIcon;
-          else if (labelKey.includes("work")) icon = workflowIcon;
-          else if (labelKey.includes("project")) icon = projectsIcon;
-          else if (labelKey.includes("tool") || labelKey.includes("ai")) icon = toolsIcon;
+        {routes
+          .filter(r => !r.reviewerOnly || user?.role === "reviewer") // <-- Only show Review for reviewers
+          .map((r) => {
+            const labelKey = r.label.toLowerCase();
+            let icon = null;
+            if (labelKey.includes("dash")) icon = dashboardIcon;
+            else if (labelKey.includes("work")) icon = workflowIcon;
+            else if (labelKey.includes("review")) icon = projectsIcon;
+            else if (labelKey.includes("tool") || labelKey.includes("ai")) icon = toolsIcon;
 
-          return (
-            <button
-              key={r.key}
-              className={`nav-item ${active === r.key ? "active" : ""}`}
-              onClick={() => handleNavigate(r.path)}
-            >
-              {icon ? <img src={icon} alt="" className="nav-icon-img nav-icon-small" /> : <span className="nav-icon" aria-hidden />}
-              <span className="nav-label">{r.label}</span>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={r.key}
+                className={`nav-item ${active === r.key ? "active" : ""}`}
+                onClick={() => handleNavigate(r.path)}
+              >
+                {icon ? <img src={icon} alt="" className="nav-icon-img nav-icon-small" /> : <span className="nav-icon" aria-hidden />}
+                <span className="nav-label">{r.label}</span>
+              </button>
+            );
+          })}
       </nav>
 
       <div className="sidebar-bottom">
