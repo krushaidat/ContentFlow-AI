@@ -357,6 +357,10 @@
 
 .modal-body {
   padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .edit-form {
@@ -399,6 +403,7 @@
 .edit-textarea {
   min-height: 200px;
   resize: vertical;
+  background-color: white;
 }
 
 .modal-actions {
@@ -436,6 +441,51 @@
 
 .btn-cancel:hover {
   background-color: #e5e7eb;
+}
+
+/* Rejection Feedback */
+.rejection-reason {
+  background-color: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+  font-size: 14px;
+  color: #78350f;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.rejection-reason strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.rejection-feedback-alert {
+  background-color: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #78350f;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.rejection-feedback-alert strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.rejection-feedback-alert p {
+  margin: 0;
+  line-height: 1.5;
+  word-wrap: break-word;
 }
 
 @media (max-width: 768px) {

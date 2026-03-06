@@ -269,13 +269,18 @@ export default function Dashboard() {
             <div key={item.id} className="dashboard-content-card content-item-box">
               {/* AMINAH: Content item box container */}
               <div className="dashboard-content-header">
-                <span className={`dashboard-badge ${getStatusBadgeClass(item.status)}`}>{item.status || "Draft"}</span>
+                <span className={`dashboard-badge ${getStatusBadgeClass(item.stage)}`}>{item.stage || "Draft"}</span>
                 <span className="dashboard-content-menu">•••</span>
               </div>
               <div className="content-item-title">{item.title}</div>
               <div className="content-item-text">{item.text}</div>
+              {item.rejectionReason && (
+                <div className="rejection-reason">
+                  <strong>Feedback:</strong> {item.rejectionReason}
+                </div>
+              )}
               <div className="content-item-meta">
-                <span className="content-item-stage">Stage: {item.stage || "Draft"}</span>
+                <span className="content-item-stage">Stage: {item.stage}</span>
                 <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
               <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
@@ -351,6 +356,26 @@ export default function Dashboard() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* In your edit modal */}
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editingId ? 'Edit Content' : 'Create New Content'}</h3>
+              <button className="modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {editingContent.rejectionReason && (
+                <div className="rejection-feedback-alert">
+                  <strong>Reviewer Feedback:</strong>
+                  <p>{editingContent.rejectionReason}</p>
+                </div>
+              )}
+              
             </div>
           </div>
         </div>

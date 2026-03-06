@@ -3,6 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import '../styles/dashboard.css';
+import '../styles/review.css';
 
 const ReviewPage = () => {
   const { user } = useAuth();
@@ -96,9 +97,16 @@ const ReviewPage = () => {
       return;
     }
 
+    const itemId = selectedItemId || viewingItem?.id; // Use viewingItem.id as fallback
+
+    if (!itemId) {
+      alert('Error: Could not identify item to reject.');
+      return;
+    }
+
     try {
-      setUpdatingId(selectedItemId);
-      await updateDoc(doc(db, 'content', selectedItemId), {
+      setUpdatingId(itemId);
+      await updateDoc(doc(db, 'content', itemId), {
         stage: 'Update',
         reviewedAt: new Date().toISOString(),
         reviewedBy: user.uid,
@@ -108,13 +116,14 @@ const ReviewPage = () => {
       
       // Update local state
       setAssignedItems(assignedItems.map(item => 
-        item.id === selectedItemId 
+        item.id === itemId 
           ? { ...item, stage: 'Update', reviewStatus: 'rejected', rejectionReason: rejectReason }
           : item
       ));
       
       setShowRejectModal(false);
       setRejectReason('');
+      setSelectedItemId(null);
       alert('Content rejected with feedback.');
     } catch (err) {
       console.error("Error rejecting content:", err);
@@ -205,22 +214,6 @@ const ReviewPage = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                   </svg>
                 </button>
-                <button 
-                  className="icon-btn approve" 
-                  title="Approve"
-                  onClick={() => handleApprove(item.id)}
-                  disabled={updatingId === item.id || item.reviewStatus === 'approved'}
-                >
-                  {updatingId === item.id ? '...' : '✓'}
-                </button>
-                <button 
-                  className="icon-btn reject" 
-                  title="Request Changes"
-                  onClick={() => handleRejectClick(item.id)}
-                  disabled={updatingId === item.id || item.reviewStatus === 'rejected'}
-                >
-                  {updatingId === item.id ? '...' : '✗'}
-                </button>
               </div>
             </div>
           ))}
@@ -248,6 +241,28 @@ const ReviewPage = () => {
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
+              <div className="modal-actions">
+                <button 
+                  className="btn-approve"
+                  onClick={() => {
+                    handleApprove(viewingItem.id);
+                    setShowViewModal(false);
+                  }}
+                  disabled={updatingId === viewingItem.id || viewingItem.reviewStatus === 'approved'}
+                >
+                  {updatingId === viewingItem.id ? 'Approving...' : '✓ Approve'}
+                </button>
+                <button 
+                  className="btn-reject"
+                  onClick={() => {
+                    setShowRejectModal(true);
+                    setShowViewModal(false);
+                  }}
+                  disabled={updatingId === viewingItem.id || viewingItem.reviewStatus === 'rejected'}
+                >
+                  ✗ Request Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>
