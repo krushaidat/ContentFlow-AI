@@ -11,6 +11,7 @@ import Profile from "./components/pages/Profile";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./components/pages/Dashboard";
 import Workflow from "./components/pages/Workflow";
+import Templates from "./components/pages/Templates";
 import Login from "./components/pages/Login";
 import Signup from "./components/pages/Signup";
 
@@ -101,6 +102,17 @@ function App() {
                   displayName={displayName}
                 >
                   <Workflow />
+                </Layout>
+              }
+            />
+            <Route
+              path="/templates"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <Templates />
                 </Layout>
               }
             />

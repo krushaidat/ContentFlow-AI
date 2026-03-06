@@ -181,7 +181,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="create-content-form">
+        <form onSubmit={handleSubmit} className="create-template-form">
           <div className="form-group">
             <label>Start from a Template</label>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -262,8 +262,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         </form>
 
         {showTemplates && (
-          <div className="templates-overlay" onClick={() => setShowTemplates(false)}>
-            <div className="templates-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="create-templates-overlay" onClick={() => setShowTemplates(false)}>
+            <div className="create-templates-panel" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header templates-header">
                 <div className="templates-header-left">
                   <span className="templates-header-icon">📄</span>

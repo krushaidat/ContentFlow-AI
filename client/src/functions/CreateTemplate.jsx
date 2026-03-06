@@ -1,43 +1,75 @@
-import React, { useState } from "react";
-import { getAuth } from "firebase/auth";
-import { addTemplate } from "../functions/templateDB";
+import React, { useEffect, useState } from "react";
+import { addTemplate, updateTemplate } from "../functions/templateDB";
 
-const CreateTemplate = ({ isOpen, onClose, onSuccess }) => {
+const CreateTemplate = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  mode = "create",
+  initialTemplate = null,
+}) => {
   const [title, setTitle] = useState("");
   const [sections, setSections] = useState("");
   const [structure, setStructure] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const auth = getAuth();
-  const user = auth.currentUser;
+  const isEditMode = mode === "edit" && Boolean(initialTemplate?.id);
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError(null);
+  useEffect(() => {
+    if (!isOpen) return;
 
-  if (!title.trim() || !structure.trim()) {
-    setError("Please fill in all fields.");
-    return;
-  }
-
-  setLoading(true);
-  try {
-    const newId = await addTemplate(title, structure);
-
-    setSuccess(true);
-
-    if (onSuccess) {
-      onSuccess(newId);
+    if (isEditMode) {
+      setTitle(initialTemplate?.title || "");
+      setSections(initialTemplate?.sections || "");
+      setStructure(initialTemplate?.content || "");
+    } else {
+      setTitle("");
+      setSections("");
+      setStructure("");
     }
 
-  } catch (err) {
-    console.error("Error creating template:", err);
-    setError("Failed to create template. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+    setError(null);
+    setSuccess(false);
+  }, [isOpen, isEditMode, initialTemplate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!title.trim() || !structure.trim()) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let savedId;
+
+      if (isEditMode) {
+        await updateTemplate(initialTemplate.id, title, structure);
+        savedId = initialTemplate.id;
+      } else {
+        savedId = await addTemplate(title, structure);
+      }
+
+      setSuccess(true);
+
+      if (onSuccess) {
+        onSuccess(savedId);
+      }
+    } catch (err) {
+      console.error("Error saving template:", err);
+      setError(
+        isEditMode
+          ? "Failed to update template. Please try again."
+          : "Failed to create template. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClose = () => {
     setTitle("");
     setSections("");
@@ -53,14 +85,16 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess }) => {
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Create New Template</h2>
+          <h2>{isEditMode ? "Edit Template" : "Create New Template"}</h2>
           <button className="modal-close" onClick={handleClose} aria-label="Close modal">×</button>
         </div>
 
         {success ? (
           <div style={{ padding: 32, textAlign: "center" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-            <h3 style={{ marginBottom: 8, color: "#111827" }}>Template Created!</h3>
+            <h3 style={{ marginBottom: 8, color: "#111827" }}>
+              {isEditMode ? "Template Updated!" : "Template Created!"}
+            </h3>
             <p style={{ color: "#6b7280", marginBottom: 24 }}>
               Your template <strong>{title}</strong> has been saved successfully.
             </p>
@@ -122,7 +156,7 @@ const CreateTemplate = ({ isOpen, onClose, onSuccess }) => {
                 className="btn-submit"
                 disabled={loading}
               >
-                {loading ? "Creating..." : "Create Template"}
+                {loading ? "Saving..." : isEditMode ? "Save Changes" : "Create Template"}
               </button>
             </div>
           </form>

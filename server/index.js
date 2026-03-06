@@ -1,6 +1,7 @@
 const db = require("./config/firebase");
 const express = require("express");
 const cors = require("cors");
+const { GoogleGenAI } = require("@google/genai");
 require("dotenv").config();
 
 const app = express();
@@ -23,6 +24,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.AIzaSyBWJRwrY9N9C8zBs8XxcK_hicz
 app.get("/api/test", (req, res) => {
   res.json({ message: "Backend connected successfully" });
 });
+
 
 /**
  * POST /api/ai/validate
@@ -129,7 +131,6 @@ app.get("/api/templates", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
 
 // Routes
 const aiRoutes = require("./routes/aiRoutes");

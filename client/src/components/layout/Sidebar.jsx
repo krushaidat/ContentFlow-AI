@@ -3,15 +3,16 @@ import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/layout.css";
 import dashboardIcon from "../../assets/dashboard.png";
 import workflowIcon from "../../assets/Workflow.png";
+import templatesIcon from "../../assets/templates.png";
 import projectsIcon from "../../assets/projects.png";
-import toolsIcon from "../../assets/tools.png";
 import settingIcon from "../../assets/setting.png";
 import helpIcon from "../../assets/help.png";
 
+// Aminah: added templates navigation from Sidebar and icons
 const routes = [
   { key: "dashboard", label: "Dashboard", path: "/dashboard" },
   { key: "workflow", label: "Workflow", path: "/workflow" },
-  { key: "documents", label: "AI Tools", path: "/aitools" },
+  { key: "templates", label: "Templates", path: "/templates" },
   { key: "review", label: "Projects", path: "/projects" }
 ];
 
@@ -47,7 +48,7 @@ const Sidebar = () => {
           if (labelKey.includes("dash")) icon = dashboardIcon;
           else if (labelKey.includes("work")) icon = workflowIcon;
           else if (labelKey.includes("project")) icon = projectsIcon;
-          else if (labelKey.includes("tool") || labelKey.includes("ai")) icon = toolsIcon;
+          else if (labelKey.includes("templates")) icon = templatesIcon;
 
           return (
             <button
@@ -55,7 +56,8 @@ const Sidebar = () => {
               className={`nav-item ${active === r.key ? "active" : ""}`}
               onClick={() => handleNavigate(r.path)}
             >
-              {icon ? <img src={icon} alt="" className="nav-icon-img nav-icon-small" /> : <span className="nav-icon" aria-hidden />}
+              {icon ? <img src={icon} alt="" className="nav-icon-img nav-icon-medium" /> : <span className="nav-icon" aria-hidden />}
+            
               <span className="nav-label">{r.label}</span>
             </button>
           );

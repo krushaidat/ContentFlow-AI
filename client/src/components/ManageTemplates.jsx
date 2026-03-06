@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "./styles/template.css";
+import "./styles/ManageTemplates.css";
 import { useEffect } from "react";
 import { fetchTemplates, deleteTemplate } from "../functions/templateDB";
 import CreateTemplate from "../functions/CreateTemplate";
@@ -10,41 +10,41 @@ import CreateTemplate from "../functions/CreateTemplate";
 // This component manages the list of templates, allowing users to view, search, edit, and delete templates. It is designed to be used as a modal within the Dashboard page.
 export default function ManageTemplates({ isOpen, onClose }) {
   const [templates, setTemplates] = useState([]);
-
-const loadTemplates = async () => {
-  try {
-    const data = await fetchTemplates();
-    setTemplates(data);
-  } catch (error) {
-    console.error("Failed to load templates:", error);
-  }
-};
-
-useEffect(() => {
-  if (isOpen) {
-    loadTemplates();
-  }
-}, [isOpen]);
-  
-
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-
-  
-
-  // Aminah: I added a search state to manage the search input for filtering templates. The filteredTemplates variable computes the list of templates that match the search query based on their name or description. The handleEdit and handleDelete functions are stubs for editing and deleting templates, which can be expanded with actual functionality later.
+   // Aminah: I added a search state to manage the search input for filtering templates. The filteredTemplates variable computes the list of templates that match the search query based on their name or description. The handleEdit and handleDelete functions are stubs for editing and deleting templates, which can be expanded with actual functionality later.
   const [search, setSearch] = useState("");
+  // Aminah: I added an isCreateOpen state to manage the visibility of the CreateTemplate component, which allows users to create new templates. When the "Create Template" button is clicked, it sets isCreateOpen to true, opening the CreateTemplate modal. The onSuccess callback passed to CreateTemplate will close the modal and reload the templates list after a new template is created.
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
 
+  const loadTemplates = async () => {
+    try {
+      const data = await fetchTemplates();
+      setTemplates(data);
+    } catch (error) {
+      console.error("Failed to load templates:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadTemplates();
+    }
+  }, [isOpen]);
+    
   if (!isOpen) return null;
 
   const filteredTemplates = templates.filter(
   (t) =>
     t.title?.toLowerCase().includes(search.toLowerCase()) ||
     t.content?.toLowerCase().includes(search.toLowerCase())
-);
+  );
 
 
   // Aminah: The handleEdit function currently just shows an alert with the template ID, but in a real application, it would likely open an edit form or navigate to an edit page. The handleDelete function updates the templates state by filtering out the deleted template based on its ID.
-  const handleEdit = (id) => alert(`Edit template ${id}`);
+  const handleEdit = (template) => {
+    setEditingTemplate(template);
+    setIsCreateOpen(true);
+  };
 
   const handleDelete = async (id) => {
   try {
@@ -53,7 +53,7 @@ useEffect(() => {
   } catch (error) {
     console.error("Delete failed:", error);
   }
-};
+  };
 
   // Aminah: The component returns a modal overlay that contains the list of templates. It includes a search input for filtering templates and displays each template with its name, description, last modified date, and action buttons for editing and deleting. 
   // If no templates match the search query, it shows a message indicating that no templates were found.
@@ -67,7 +67,10 @@ useEffect(() => {
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <button
             className="btn-submit"
-            onClick={() => setIsCreateOpen(true)}
+            onClick={() => {
+              setEditingTemplate(null);
+              setIsCreateOpen(true);
+            }}
              >
               + Create Template
            </button>
@@ -88,7 +91,7 @@ useEffect(() => {
 
         <div className="manage-templates-list">
           {filteredTemplates.length === 0 ? (
-            <div style={{ padding: 24, color: "#6b7280" }}>
+            <div className="empty-templates">
               No templates found.
             </div>
           ) : (
@@ -107,7 +110,7 @@ useEffect(() => {
                 </div>
 
                 <div className="manage-template-card-actions">
-                  <button onClick={() => handleEdit(template.id)}>
+                  <button onClick={() => handleEdit(template)}>
                     Edit
                   </button>
                   <button onClick={() => handleDelete(template.id)}>
@@ -123,9 +126,15 @@ useEffect(() => {
     </div>
    <CreateTemplate
       isOpen={isCreateOpen}
-      onClose={() => setIsCreateOpen(false)}
+      mode={editingTemplate ? "edit" : "create"}
+      initialTemplate={editingTemplate}
+      onClose={() => {
+        setIsCreateOpen(false);
+        setEditingTemplate(null);
+      }}
       onSuccess={() => {
         setIsCreateOpen(false);
+        setEditingTemplate(null);
         loadTemplates();
       }}
     />
