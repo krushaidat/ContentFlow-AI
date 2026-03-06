@@ -1,3 +1,46 @@
+/* Abdalaa: This container ensures the dashboard stays inside
+   the layout boundaries and never overlaps the sidebar. */
+.dashboard-main {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: calc(100vh - 88px);
+  box-sizing: border-box;
+  background: #f5f3ff;
+}
+
+/* Abdalaa: Using flex layout so cards stack vertically
+   and remain aligned with proper spacing. */
+
+.dashboard-content-list {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: transparent;
+}
+
+/* Abdalaa: Prevent cards from exceeding the layout width.
+   This ensures the cards never slide under the sidebar. */
+
+.dashboard-content-card,
+.content-item-box {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Abdalaa: Handles long text content so titles or body text
+   cannot push the card outside its container. */
+   
+.content-item-title,
+.content-item-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .content-item-box {
   background: #fff;
   border-radius: 12px;
