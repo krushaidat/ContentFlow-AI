@@ -196,11 +196,10 @@ export default function Dashboard() {
   const handleManageTemplates = () => {
     setShowTemplatesModal(true);
   };
-
+  
   const handleCloseTemplatesModal = () => {
     setShowTemplatesModal(false);
   };
-
 
 
   if (!user && !loading) {

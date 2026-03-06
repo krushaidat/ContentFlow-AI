@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
+import { db } from "../firebase"; 
 import "./styles/ManageTemplates.css";
-import { useEffect } from "react";
 import { fetchTemplates, deleteTemplate } from "../functions/templateDB";
 import CreateTemplate from "../functions/CreateTemplate";
 
@@ -87,6 +89,13 @@ export default function ManageTemplates({ isOpen, onClose }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <button
+            className="dashboard-card-btn"
+            onClick={() => setShowCreateModal(true)}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            + Add Template
+          </button>
         </div>
 
         <div className="manage-templates-list">

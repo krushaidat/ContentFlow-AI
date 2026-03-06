@@ -1,13 +1,20 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+const admin = require("firebase-admin");
+const path = require("path");
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDNYV8rYI9D6SY9HIvXvXrWSysALDrp_ak",
-  authDomain: "contentflow-ai-80993.firebaseapp.com",
-  projectId: "contentflow-ai-80993",
-};
+// Load the service account key
+const serviceAccount = require(path.join(__dirname, "../firebase-key.json"));
 
-const app = initializeApp(firebaseConfig); 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Only initialize if not already initialized
+if (admin.apps.length === 0) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    projectId: serviceAccount.project_id,
+  });
+  console.log("Firebase Admin SDK initialized successfully");
+} else {
+  console.log("Firebase Admin SDK already initialized");
+}
+
+// Export the Firestore database instance
+const db = admin.firestore();
+module.exports = db;

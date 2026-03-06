@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { addTemplate, updateTemplate } from "../functions/templateDB";
+import React, { useState, useEffect } from "react";
+import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { db } from "../firebase";
 
 const CreateTemplate = ({
   isOpen,
@@ -14,57 +16,54 @@ const CreateTemplate = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const isEditMode = mode === "edit" && Boolean(initialTemplate?.id);
+  const auth = getAuth();
 
+  /** DRAVEN: Fetch existing template data if editing. If creating, fields are reset to empty. */
   useEffect(() => {
-    if (!isOpen) return;
-
-    if (isEditMode) {
-      setTitle(initialTemplate?.title || "");
-      setSections(initialTemplate?.sections || "");
-      setStructure(initialTemplate?.content || "");
+    if (existingTemplate) {
+      setTitle(existingTemplate.title || "");
+      setRequiredSections(existingTemplate.requiredSections || "");
+      setStructure(existingTemplate.structure || "");
     } else {
       setTitle("");
-      setSections("");
+      setRequiredSections("");
       setStructure("");
     }
+  }, [existingTemplate]);
 
-    setError(null);
-    setSuccess(false);
-  }, [isOpen, isEditMode, initialTemplate]);
-
+  /** DRAVEN: Handle form submission for creating or updating a template */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
-    if (!title.trim() || !structure.trim()) {
+    if (!title.trim() || !requiredSections.trim() || !structure.trim()) {
       setError("Please fill in all fields.");
       return;
     }
 
     setLoading(true);
     try {
-      let savedId;
-
-      if (isEditMode) {
-        await updateTemplate(initialTemplate.id, title, structure);
-        savedId = initialTemplate.id;
+      if (existingTemplate) {
+        await updateDoc(doc(db, "templates", existingTemplate.id), {
+          title,
+          requiredSections,
+          structure,
+          lastModified: new Date().toLocaleDateString(),
+        });
       } else {
-        savedId = await addTemplate(title, structure);
+        await addDoc(collection(db, "templates"), {
+          title,
+          requiredSections,
+          structure,
+          lastModified: new Date().toLocaleDateString(),
+          createdBy: auth.currentUser.uid,
+        });
       }
-
       setSuccess(true);
-
-      if (onSuccess) {
-        onSuccess(savedId);
-      }
+      onSuccess();
     } catch (err) {
       console.error("Error saving template:", err);
-      setError(
-        isEditMode
-          ? "Failed to update template. Please try again."
-          : "Failed to create template. Please try again."
-      );
+      setError("Failed to save template. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -72,7 +71,7 @@ const CreateTemplate = ({
 
   const handleClose = () => {
     setTitle("");
-    setSections("");
+    setRequiredSections("");
     setStructure("");
     setError(null);
     setSuccess(false);
@@ -85,16 +84,14 @@ const CreateTemplate = ({
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{isEditMode ? "Edit Template" : "Create New Template"}</h2>
+          <h2>{existingTemplate ? "Edit Template" : "Create New Template"}</h2>
           <button className="modal-close" onClick={handleClose} aria-label="Close modal">×</button>
         </div>
 
         {success ? (
           <div style={{ padding: 32, textAlign: "center" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-            <h3 style={{ marginBottom: 8, color: "#111827" }}>
-              {isEditMode ? "Template Updated!" : "Template Created!"}
-            </h3>
+            <h3 style={{ marginBottom: 8, color: "#111827" }}>{existingTemplate ? "Template Updated!" : "Template Created!"}</h3>
             <p style={{ color: "#6b7280", marginBottom: 24 }}>
               Your template <strong>{title}</strong> has been saved successfully.
             </p>
@@ -156,7 +153,9 @@ const CreateTemplate = ({
                 className="btn-submit"
                 disabled={loading}
               >
-                {loading ? "Saving..." : isEditMode ? "Save Changes" : "Create Template"}
+                {loading
+                  ? (existingTemplate ? "Saving..." : "Creating...")
+                  : (existingTemplate ? "Save Changes" : "Create Template")}
               </button>
             </div>
           </form>
