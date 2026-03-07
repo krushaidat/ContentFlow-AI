@@ -278,7 +278,16 @@ export default function Dashboard() {
               {/* AMINAH: Content item box container */}
               <div className="dashboard-content-header">
                 <span className={`dashboard-badge ${getStatusBadgeClass(item.stage)}`}>{item.stage || "Draft"}</span>
-                <span className="dashboard-content-menu">•••</span>
+                {/*- Moved edit and delete buttons from `.dashboard-content-actions` at the bottom to `.dashboard-content-header` at the top
+                  - Buttons now positioned at top-right of each card*/}
+                <div className="dashboard-content-actions">
+                  <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button className="icon-btn delete" onClick={(e) => handleDeleteClick(e, item.id)} title="Delete">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
               </div>
               <div className="content-item-title">{item.title}</div>
               <div className="content-item-text">{item.text}</div>
@@ -292,14 +301,6 @@ export default function Dashboard() {
                 <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
               <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
-              <div className="dashboard-content-actions">
-                <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">
-                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                </button>
-                <button className="icon-btn delete" onClick={(e) => handleDeleteClick(e, item.id)} title="Delete">
-                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </button>
-              </div>
             </div>
           ))}
         </div>

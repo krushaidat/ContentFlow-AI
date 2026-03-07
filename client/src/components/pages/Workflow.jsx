@@ -287,7 +287,6 @@ const Workflow = () => {
                       </div>
 
                       <div className="wf-item-text">{item.text}</div>
-                      <div className="wf-item-text">{item.text}</div>
 
                       <div className="wf-item-footer">
                         <span className="wf-dot" />
