@@ -1,4 +1,3 @@
-// TA: Import dependencies for React hooks, routing, styling, and calendar data service
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/calendar.css";
@@ -6,7 +5,6 @@ import { getCalendarData } from "../../utils/calendarService";
 
 // TA: Main Calendar component - manages calendar state and rendering with multiple view modes (month/week/day)
 const Calendar = () => {
-  // TA: Initialize state hooks for navigation, date tracking, events, loading state, search, and UI dropdowns
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date(2024, 3, 1));
   const [events, setEvents] = useState([]);
@@ -18,7 +16,7 @@ const Calendar = () => {
   const monthDropdownRef = useRef(null);
   const viewDropdownRef = useRef(null);
 
-  // TA: Handle outside clicks to close dropdowns - listens for mousedown events and closes dropdowns if click is outside
+  // TA: Event listeners and data fetching
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target)) {
@@ -32,7 +30,6 @@ const Calendar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // TA: Fetch calendar events on component mount - loads events from service and manages loading state
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -48,12 +45,10 @@ const Calendar = () => {
     loadData();
   }, []);
 
-  // TA: Helper functions for date calculations - get month days, first day of month, and format dates for display
+  // TA: Utility functions for date calculations, event filtering, and navigation handling
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-
   const formatMonthYear = (date) => date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
   const formatWeekRange = (date) => {
     const first = new Date(date);
     const last = new Date(date);
@@ -61,8 +56,6 @@ const Calendar = () => {
     last.setDate(last.getDate() + (6 - last.getDay()));
     return `${first.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${last.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
   };
-
-  // TA: Helper to generate array of 7 days in a week starting from Sunday
   const getWeekDays = (date) => {
     const weekStart = new Date(date);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
@@ -73,66 +66,50 @@ const Calendar = () => {
     }
     return days;
   };
-
-  // TA: Generate array of hours (0-23) for day and week view time slots
   const getHours = () => Array.from({ length: 24 }, (_, i) => i);
-
-  // TA: Filter events by day number for month view - matches events to specific calendar dates
   const getEventsForDate = (day) => {
     const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toISOString().split("T")[0];
     return events.filter((event) => new Date(event.suggestedDate).toISOString().split("T")[0] === dateStr);
   };
-
-  // TA: Filter events by date object for week and day views - matches events to date objects
   const getEventsForDateObj = (dateObj) => {
     const dateStr = dateObj.toISOString().split("T")[0];
     return events.filter((event) => new Date(event.suggestedDate).toISOString().split("T")[0] === dateStr);
   };
-
-  // TA: Navigation handlers for month/week/day views - update current date when user navigates between periods
   const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
   const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   const handlePrevWeek = () => { const d = new Date(currentDate); d.setDate(d.getDate() - 7); setCurrentDate(d); };
   const handleNextWeek = () => { const d = new Date(currentDate); d.setDate(d.getDate() + 7); setCurrentDate(d); };
   const handlePrevDay = () => { const d = new Date(currentDate); d.setDate(d.getDate() - 1); setCurrentDate(d); };
   const handleNextDay = () => { const d = new Date(currentDate); d.setDate(d.getDate() + 1); setCurrentDate(d); };
-
-  // TA: Helper functions for event status styling and labels - maps status values to CSS classes and display text
   const getBadgeColor = (status) => {
     const s = status?.toLowerCase();
     return s === "completed" ? "badge-completed" : s === "scheduled" ? "badge-scheduled" : "badge-idea";
   };
-
   const getStatusLabel = (status) => {
     const s = status?.toLowerCase();
     return s === "completed" ? "Completed Post" : s === "scheduled" ? "Scheduled Post" : "Idea / Suggestion";
   };
-
-  // TA: Get appropriate navigation handlers and date display based on current view mode
   const getPrevHandler = () => (viewMode === "month" ? handlePrevMonth : viewMode === "week" ? handlePrevWeek : handlePrevDay);
   const getNextHandler = () => (viewMode === "month" ? handleNextMonth : viewMode === "week" ? handleNextWeek : handleNextDay);
-
   const getDateDisplay = () => {
     if (viewMode === "month") return formatMonthYear(currentDate);
     if (viewMode === "week") return formatWeekRange(currentDate);
     return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   };
 
-  // TA: Prepare calendar data - build day array with empty slots, filter events by search, and define weekday labels
+  // TA: Prepare calendar grid data and filter events by search query
   const days = [];
   const firstDay = getFirstDayOfMonth(currentDate);
   const daysInMonth = getDaysInMonth(currentDate);
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let day = 1; day <= daysInMonth; day++) days.push(day);
-
   const filteredEvents = events.filter((event) =>
     event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     event.reason?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  // TA: Render main calendar UI with header and subtitle
+  // TA: Render calendar UI
   return (
     <div className="calendar-container">
       <div className="calendar-header">
@@ -140,7 +117,7 @@ const Calendar = () => {
         <p className="calendar-subtitle">Plan your content strategy with AI-suggested posts based on your calendar and analytics data</p>
       </div>
 
-      {/* TA: Top navigation bar with prev/next buttons, date selector, search, and view mode toggle */}
+      {/* TA: Navigation and controls section */}
       <div className="calendar-top-bar">
         <div className="nav-section">
           <button className="nav-arrow-btn prev" onClick={getPrevHandler()}>‹</button>
@@ -184,19 +161,19 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* TA: Display legend showing event status color codes */}
+      {/* TA: Event status legend */
       <div className="calendar-legend">
         <div className="legend-item"><span className="legend-badge legend-idea"></span><span>Idea / Suggestion</span></div>
         <div className="legend-item"><span className="legend-badge legend-scheduled"></span><span>Scheduled Post</span></div>
         <div className="legend-item"><span className="legend-badge legend-completed"></span><span>Completed Post</span></div>
       </div>
 
-      {/* TA: Show loading state or render calendar views based on data loading status */}
+      {/* TA: Calendar views (month, week, day) and search results */}
       {loading ? (
         <div className="loading">Loading calendar data...</div>
       ) : (
         <div className="calendar-wrapper">
-          {/* TA: Month view - displays calendar grid with day numbers and events */}
+          {/* Month view */}
           {viewMode === "month" && (
             <div className="calendar">
               <div className="calendar-grid">
@@ -223,7 +200,7 @@ const Calendar = () => {
             </div>
           )}
 
-          {/* TA: Week view - displays hourly grid for 7 days with time slots */}
+          {/* Week view */}
           {viewMode === "week" && (
             <div className="week-view">
               <div className="week-header">
@@ -251,7 +228,7 @@ const Calendar = () => {
             </div>
           )}
 
-          {/* TA: Day view - displays hourly grid for single day with event details */}
+          {/* Day view */}
           {viewMode === "day" && (
             <div className="day-view">
               <div className="day-title">{currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
@@ -276,7 +253,7 @@ const Calendar = () => {
         </div>
       )}
 
-      {/* TA: Display search results when search query has matches */}
+      {/* Search results */}
       {searchQuery && filteredEvents.length > 0 && (
         <div className="search-results">
           <h3>Search Results ({filteredEvents.length})</h3>
