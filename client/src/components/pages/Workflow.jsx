@@ -21,6 +21,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
+import { useAuth } from "../../hooks/useAuth";
 import { assignReviewerWithGemini, getAvailableReviewers } from "../../utils/geminiReviewerAssignment";
 import "../styles/workflow.css";
 
@@ -58,6 +59,8 @@ const stageBadgeClass = (stage) => {
 };
 
 const Workflow = () => {
+  const { user } = useAuth();
+  
   // Stage selected in dropdown
   const [selectedStage, setSelectedStage] = useState("Draft");
 
@@ -71,6 +74,12 @@ const Workflow = () => {
   // Validation states
   const [validationResult, setValidationResult] = useState(null);
   const [showValidationPanel, setShowValidationPanel] = useState(false);
+
+  // Reviewer management states
+  const [availableReviewers, setAvailableReviewers] = useState([]);
+  const [selectedReviewer, setSelectedReviewer] = useState(null);
+  const [assigningReviewer, setAssigningReviewer] = useState(false);
+  const [reviewerError, setReviewerError] = useState("");
 
   // UI states
   const [loading, setLoading] = useState(false);
@@ -193,13 +202,88 @@ const Workflow = () => {
   };
 
   /**
+   * Fetch available reviewers from Firestore
+   * Only fetch if user is an admin
+   */
+  const fetchReviewers = async () => {
+    if (!user?.uid || user?.role !== "admin") {
+      setAvailableReviewers([]);
+      return;
+    }
+
+    try {
+      const reviewers = await getAvailableReviewers(db, collection, query, getDocs);
+      setAvailableReviewers(reviewers);
+    } catch (err) {
+      console.error("Error fetching reviewers:", err);
+      setReviewerError("Failed to load reviewers");
+    }
+  };
+
+  /**
+   * Assign a reviewer to the selected content item
+   */
+  const handleAssignReviewer = async () => {
+    if (!selectedReviewer || !selectedContent || !user?.uid || user?.role !== "admin") {
+      setReviewerError("Please select a reviewer");
+      return;
+    }
+
+    setAssigningReviewer(true);
+    setReviewerError("");
+
+    try {
+      const response = await fetch("http://localhost:5000/api/team/assign-reviewer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminId: user.uid,
+          contentId: selectedContent.id,
+          reviewerId: selectedReviewer,
+          teamId: user.teamId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to assign reviewer");
+      }
+
+      const data = await response.json();
+      alert(`Reviewer assigned: ${data.reviewerName}`);
+      
+      // Update the selected content to show the reviewer
+      setSelectedContent({
+        ...selectedContent,
+        reviewerId: selectedReviewer,
+        assignedAt: new Date().toISOString(),
+      });
+
+      setSelectedReviewer(null);
+      await fetchContent();
+    } catch (err) {
+      console.error("Error assigning reviewer:", err);
+      setReviewerError(err.message || "Failed to assign reviewer");
+    } finally {
+      setAssigningReviewer(false);
+    }
+  };
+
+  /**
    * Fetch content when stage changes
    */
   useEffect(() => {
     fetchContent();
     setValidationResult(null);
     setShowValidationPanel(false);
-  }, [selectedStage]);
+    
+    // Fetch reviewers if viewing Review stage and user is admin
+    if (selectedStage === "Review" && user?.role === "admin") {
+      fetchReviewers();
+    }
+  }, [selectedStage, user?.role, user?.uid]);
 
   return (
     <div className="workflow-bg">
@@ -301,8 +385,10 @@ const Workflow = () => {
             </div>
           </section>
 
-          {/* RIGHT SIDE — AI Validation Panel */}
-          <aside className="wf-card validation-panel">
+          {/* RIGHT SIDE — Panels Container */}
+          <div className="wf-right-panels">
+            {/* AI Validation Panel */}
+            <aside className="wf-card validation-panel">
             <div className="wf-card-header">
               <div className="wf-card-title">
                 AI Content Validation
@@ -464,8 +550,83 @@ const Workflow = () => {
                   </div>
                 </div>
               )}
+
             </div>
           </aside>
+
+          {/* Assign Reviewer Card — Shows only in Review stage for admins */}
+          {selectedStage === "Review" && user?.role === "admin" && selectedContent && (
+            <aside className="wf-card reviewer-card">
+              <div className="wf-card-header">
+                <div className="wf-card-title">
+                  Assign Reviewer 👤
+                </div>
+              </div>
+
+              <div className="wf-card-body">
+                <div className="reviewer-assignment">
+                  {/* Current Reviewer Status */}
+                  <div className="reviewer-section">
+                    <div className="reviewer-subtitle">Current Assignment</div>
+                    {selectedContent.reviewerId ? (
+                      <div className="reviewer-assigned">
+                        <span className="reviewer-badge">✓ Assigned</span>
+                        <div className="reviewer-id-text">ID: {selectedContent.reviewerId}</div>
+                      </div>
+                    ) : (
+                      <div className="reviewer-unassigned">
+                        <span className="reviewer-badge-empty">⊘ Not Assigned</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reviewer Selector */}
+                  <div className="reviewer-section">
+                    <label className="reviewer-label">Select Reviewer</label>
+                    {availableReviewers.length > 0 ? (
+                      <>
+                        <div className="select-wrap">
+                          <select
+                            className="select reviewer-select"
+                            value={selectedReviewer || ""}
+                            onChange={(e) => setSelectedReviewer(e.target.value)}
+                          >
+                            <option value="">Choose a reviewer...</option>
+                            {availableReviewers.map((reviewer) => (
+                              <option key={reviewer.uid} value={reviewer.uid}>
+                                {reviewer.name || reviewer.email} ({reviewer.currentLoad || 0}/5)
+                              </option>
+                            ))}
+                          </select>
+                          <span className="select-caret">▾</span>
+                        </div>
+
+                        <button
+                          className="assign-reviewer-btn"
+                          onClick={handleAssignReviewer}
+                          disabled={!selectedReviewer || assigningReviewer}
+                        >
+                          {assigningReviewer ? "Assigning..." : "Assign Reviewer"}
+                        </button>
+                      </>
+                    ) : (
+                      <div className="reviewer-empty">
+                        <p>No reviewers available in your team.</p>
+                        <small>Add team members with "reviewer" role to assign reviews.</small>
+                      </div>
+                    )}
+
+                    {reviewerError && (
+                      <div className="reviewer-error">
+                        {reviewerError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </aside>
+          )}
+          </div>
         </div>
 
         <p className="workflow-note modern-note">

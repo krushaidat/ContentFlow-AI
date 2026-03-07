@@ -85,6 +85,10 @@ const aiRoutes = require("./routes/aiRoutes");
 app.use("/api/ai", aiRoutes);
 console.log("✓ AI routes loaded");
 
+const teamRoutes = require("./routes/teamRoutes");
+app.use("/api/team", teamRoutes);
+console.log("✓ Team routes loaded");
+
 console.log("Starting server on port", PORT);
 app.listen(PORT, () => {
   console.log(`✓✓✓ SERVER RUNNING ON PORT ${PORT} ✓✓✓`);

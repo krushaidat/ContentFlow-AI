@@ -15,6 +15,7 @@ const routes = [
   { key: "dashboard", label: "Dashboard", path: "/dashboard" },
   { key: "workflow", label: "Workflow", path: "/workflow" },
   { key: "templates", label: "Templates", path: "/templates" },
+  { key: "calendar", label: "Calendar", path: "/calendar" },
   { key: "review", label: "Review", path: "/review", reviewerOnly: true },
   { key: "team", label: "Team", path: "/team" }
 ];
@@ -54,6 +55,7 @@ const Sidebar = () => {
             if (labelKey.includes("dash")) icon = dashboardIcon;
             else if (labelKey.includes("work")) icon = workflowIcon;
             else if (labelKey.includes("templates")) icon = templatesIcon;
+            else if (labelKey.includes("calendar")) icon = toolsIcon;
             else if (labelKey.includes("review")) icon = projectsIcon;
             else if (labelKey.includes("team")) icon = teamIcon;
 

@@ -1,33 +1,33 @@
 import { useEffect, useState } from "react";
 import { auth } from "../firebase";
-import { getDoc, doc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 
 export function useAuth() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
       if (firebaseUser) {
-        try {
-          const userDoc = await getDoc(doc(db, "Users", firebaseUser.uid));
+        // Set up real-time listener for user document in Firestore
+        const userDocRef = doc(db, "Users", firebaseUser.uid);
+        const unsubscribeSnapshot = onSnapshot(userDocRef, (userDoc) => {
           if (userDoc.exists()) {
             const userData = { 
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              role: firebaseUser.role || userDoc.data().role || "user", // <-- Get role from Firestore or default to "user"
+              role: userDoc.data().role || "user",
               ...userDoc.data() 
             };
-
-            
             setUser(userData);
           } else {
             setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: "user" });
           }
-        } catch (error) {
+        }, (error) => {
           console.error("Error fetching user data:", error);
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: "user" });
-        }
+        });
+        return unsubscribeSnapshot;
       } else {
         setUser(null);
       }

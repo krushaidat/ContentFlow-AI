@@ -105,16 +105,27 @@ export default function Team() {
   };
 //**DRAVEN This function allows admins to add members to their team by email. */
   const handleAddMemberByEmail = async () => {
-    if (!inviteEmail.trim() || !team?.id || !isAdmin) return;
+    if (!inviteEmail.trim() || !team?.id || !isAdmin || !user?.uid) return;
     setSaving(true);
     setError("");
     try {
-      const q = query(collection(db, "Users"), where("email", "==", inviteEmail.trim().toLowerCase()));
-      const snap = await getDocs(q);
-      if (snap.empty) throw new Error("No user found with that email.");
+      // Call backend API to add member to team
+      const response = await fetch("http://localhost:5000/api/team/add-member", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminId: user.uid,
+          memberEmail: inviteEmail.trim().toLowerCase(),
+          teamId: team.id,
+        }),
+      });
 
-      const target = snap.docs[0];
-      await updateDoc(doc(db, "Users", target.id), { teamId: team.id });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to add member.");
+      }
 
       setInviteEmail("");
       await loadTeamData();
@@ -126,11 +137,29 @@ export default function Team() {
   };
 //**DRAVEN This function allows admins to change the role of team members. */
   const handleRoleChange = async (memberUid, newRole) => {
-    if (!isAdmin || !team?.id) return;
+    if (!isAdmin || !team?.id || !user?.uid) return;
     setSaving(true);
     setError("");
     try {
-      await updateDoc(doc(db, "Users", memberUid), { role: newRole });
+      // Call backend API to change member role
+      const response = await fetch("http://localhost:5000/api/team/change-role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminId: user.uid,
+          memberId: memberUid,
+          newRole: newRole,
+          teamId: team.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update role.");
+      }
+
       await loadTeamData();
     } catch (e) {
       setError(e.message || "Failed to update role.");

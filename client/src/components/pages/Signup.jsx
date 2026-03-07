@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase';
+import { db } from '../../firebase';
+import { setDoc, doc, getDoc } from 'firebase/firestore';
 import '../styles/Signup.css';
 import Login from "../pages/Login";
 import {AiOutlineEye, AiOutlineEyeInvisible} from 'react-icons/ai'
@@ -197,6 +199,30 @@ function Signup({ onSignup }) {
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
       const user = userCredential.user;
+      
+      // Create user profile document in Firestore if it doesn't exist
+      const userDocRef = doc(db, "Users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      const nameParts = (user.displayName || '').split(' ');
+      const firstName = nameParts[0] || 'User';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      const userData = {
+        email: user.email.toLowerCase(),
+        firstName: firstName,
+        lastName: lastName,
+        displayName: user.displayName || user.email,
+      };
+      
+      // Only add role if user document doesn't exist (new user)
+      if (!userDocSnap.exists()) {
+        userData.role = "user";
+        userData.createdAt = new Date();
+      }
+      
+      await setDoc(userDocRef, userData, { merge: true }); // merge: true ensures we don't overwrite if doc exists
+      
       await user.getIdToken();
       navigate('/dashboard');
     } catch (err) {
@@ -292,6 +318,17 @@ function Signup({ onSignup }) {
 
       const fullName = `${formData.firstName} ${formData.lastName}`;
       await updateProfile(createdUser, { displayName: fullName });
+
+      // Create user profile document in Firestore
+      await setDoc(doc(db, "Users", createdUser.uid), {
+        email: formData.email.toLowerCase(),
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        displayName: fullName,
+        role: "user",
+        createdAt: new Date(),
+      });
+
       await sendEmailVerification(createdUser);
 
       // Show verification popup and reset form

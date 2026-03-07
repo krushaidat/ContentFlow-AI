@@ -12,6 +12,7 @@ import Layout from "./components/layout/Layout";
 import Dashboard from "./components/pages/Dashboard";
 import Workflow from "./components/pages/Workflow";
 import Templates from "./components/pages/Templates";
+import Calendar from "./components/pages/Calendar";
 import Login from "./components/pages/Login";
 import Signup from "./components/pages/Signup";
 import ReviewPage from "./components/pages/Review";
@@ -137,6 +138,17 @@ function App() {
                   displayName={displayName}
                 >
                   <Team />
+                </Layout>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <Calendar />
                 </Layout>
               }
             />
