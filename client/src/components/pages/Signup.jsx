@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase';
@@ -16,7 +16,7 @@ import {AiOutlineEye, AiOutlineEyeInvisible} from 'react-icons/ai'
  * - Maintains two-column layout with form on left, info panel on right
  * - Features email verification and Google sign-up option
  */
-function Signup() {
+function Signup({ onSignup }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
@@ -30,9 +30,141 @@ function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [showVerificationPopup, setShowVerificationPopup] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationUser, setVerificationUser] = useState(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendFeedback, setResendFeedback] = useState({ type: '', message: '' });
   const tooltipRef = useRef(null);
   const infoIconRef = useRef(null);
   const googleProvider = new GoogleAuthProvider();
+
+  // Aminah: The handleCloseVerificationPopup function is responsible for closing the email verification popup and resetting any related state. It also navigates the user back to the login page after they close the popup. T
+  
+
+  const handleCloseVerificationPopup = async () => {
+    setShowVerificationPopup(false);
+    setResendFeedback({ type: '', message: '' });
+    setResendCooldown(0);
+    setVerificationUser(null);
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Error signing out after closing verification popup:', err);
+    }
+    navigate('/login');
+  };
+
+  // Aminah: The handleVerifiedSignupRedirect function is responsible for completing the signup process and redirecting the user to the dashboard after their email has been verified. It retrieves the user's ID token, creates a session object, and either calls the onSignup callback or stores the session in localStorage. It also resets the verification popup state and navigates to the dashboard.
+
+  const handleVerifiedSignupRedirect = useCallback(async (user) => {
+    try {
+      const idToken = await user.getIdToken(true);
+      const sessionUser = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || '',
+        token: idToken,
+      };
+
+      if (onSignup) {
+        onSignup(sessionUser);
+      } else {
+        localStorage.setItem('userSession', JSON.stringify(sessionUser));
+      }
+
+      setShowVerificationPopup(false);
+      setResendFeedback({ type: '', message: '' });
+      setVerificationUser(null);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Error completing verified signup redirect:', err);
+    }
+  }, [onSignup, navigate]);
+
+  // Aminah: The handleResendVerificationEmail function allows users to resend the verification email if they didn't receive it or if it expired. It handles loading state and provides feedback on whether the resend was successful or if there was an error.
+
+
+  const handleResendVerificationEmail = async () => {
+    if (resendCooldown > 0) return;
+
+    const targetUser = verificationUser || auth.currentUser;
+
+    if (!targetUser) {
+      setResendFeedback({
+        type: 'error',
+        message: 'Unable to resend verification email right now. Please try again later.'
+      });
+      return;
+    }
+    
+    // Aminah: We set the resendLoading state to true to indicate that the resend process is in progress, and we reset any previous feedback messages.
+    
+    setResendLoading(true);
+    setResendFeedback({ type: '', message: '' });
+    
+    //Aminah:  We then attempt to send the email verification again using Firebase's sendEmailVerification function. If it's successful, we update the resendFeedback state with a success message. If there's an error during this process, we catch it and update the resendFeedback state with an error message. Finally, we set resendLoading back to false to indicate that the process has completed, regardless of the outcome.
+
+    try {
+      await sendEmailVerification(targetUser);
+      setResendCooldown(30);
+      setResendFeedback({
+        type: 'success',
+        message: 'Verification email sent again. Please check your inbox.'
+      });
+    } catch (err) {
+      console.error('Resend verification error:', err);
+      setResendFeedback({
+        type: 'error',
+        message: 'Failed to resend verification email. Please try again.'
+      });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showVerificationPopup || resendCooldown <= 0) return;
+
+    const cooldownTimer = setTimeout(() => {
+      setResendCooldown((prev) => Math.max(prev - 1, 0));
+    }, 1000);
+
+    return () => clearTimeout(cooldownTimer);
+  }, [showVerificationPopup, resendCooldown]);
+
+  useEffect(() => {
+    if (!showVerificationPopup || !verificationUser) return;
+
+    let isDisposed = false;
+
+    // Aminah: This effect sets up an interval to check the email verification status of the user every 5 seconds.
+
+
+    const checkVerificationStatus = async () => {
+      try {
+        await verificationUser.reload();
+        const refreshedUser = auth.currentUser || verificationUser;
+
+        // If the user's email is verified, we call the handleVerifiedSignupRedirect function to complete the signup process and redirect them to the dashboard. We also check the isDisposed flag to ensure that we don't attempt to update state or navigate if the component has been unmounted.
+
+        if (!isDisposed && refreshedUser?.emailVerified) {
+          await handleVerifiedSignupRedirect(refreshedUser);
+        }
+      } catch (err) {
+        console.error('Error checking email verification status:', err);
+      }
+    };
+
+    checkVerificationStatus();
+    const verificationInterval = setInterval(checkVerificationStatus, 5000);
+
+    return () => {
+      isDisposed = true;
+      clearInterval(verificationInterval);
+    };
+  }, [showVerificationPopup, verificationUser, handleVerifiedSignupRedirect]);
   
   // Close tooltip when clicking outside
   useEffect(() => {
@@ -153,10 +285,22 @@ function Signup() {
         formData.password
       );
 
+      // Aminah: Show a popup informing them to check their email for the verification link.
+
+      const createdUser = userCredential.user;
+      const createdEmail = formData.email;
+
       const fullName = `${formData.firstName} ${formData.lastName}`;
-      await updateProfile(userCredential.user, { displayName: fullName });
-      await sendEmailVerification(userCredential.user);
-      await signOut(auth);
+      await updateProfile(createdUser, { displayName: fullName });
+      await sendEmailVerification(createdUser);
+
+      // Show verification popup and reset form
+
+      setVerificationEmail(createdEmail);
+      setVerificationUser(createdUser);
+      setShowVerificationPopup(true);
+      setResendCooldown(60);
+      setResendFeedback({ type: '', message: '' });
 
       setFormData({
         firstName: '',
@@ -167,9 +311,6 @@ function Signup() {
       });
 
       setErrors({});
-
-      alert('Account created successfully! Please check your email to verify your account before logging in.');
-      navigate('/login');
     } catch (error) {
       console.error('Signup error:', error);
       let errorMessage = 'Failed to create account. Please try again.';
@@ -529,6 +670,57 @@ function Signup() {
           <small>- Marketing Team Lead</small>
         </div>
       </div>
+
+      {showVerificationPopup && (
+        <div className="verify-email-overlay" onClick={handleCloseVerificationPopup}>
+          <div className="verify-email-popup" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="verify-email-close-btn"
+              onClick={handleCloseVerificationPopup}
+              aria-label="Close verification popup"
+            >
+              ×
+            </button>
+            <div className="verify-email-content">
+            <div className="verify-email-icon" role="img" aria-label="Email">
+              📧
+            </div>
+
+            <h3>Please verify your email</h3>
+            <p>
+              We sent an email to <strong>{verificationEmail || 'member@email.com'}</strong>
+            </p>
+            <p>
+              Click on the link in that email to complete your signup. If you don't see it, you may need to check your spam folder.
+            </p>
+            <p>Still can't find the email? No problem.</p>
+            </div>
+            <button
+              type="button"
+              className="verify-email-resend-btn"
+              onClick={handleResendVerificationEmail}
+              disabled={resendLoading || resendCooldown > 0}
+            >
+              {resendLoading
+                ? 'Sending...'
+                : resendCooldown > 0
+                ? `Resend Verification Email (${resendCooldown}s)`
+                : 'Resend Verification Email'}
+            </button>
+
+            {resendFeedback.message && (
+              <div
+                className={`verify-email-feedback ${
+                  resendFeedback.type === 'error' ? 'error' : 'success'
+                }`}
+              >
+                {resendFeedback.message}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

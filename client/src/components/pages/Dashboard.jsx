@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const auth = getAuth();
   /** DRAVEN
@@ -142,22 +143,24 @@ export default function Dashboard() {
   /**
    * Handles when the user clicks the delete icon on a content card
    - Stops the click from bubbling up
-   - Shows a confirmation dialog to prevent accidental deletion
-   - If confirmed, deletes the content from Firestore database
-   - Refreshes the content list after successful deletion
+   - Opens a confirmation popup to prevent accidental deletion
    * @param {Event} e - The click event
    * @param {string} contentId - The ID of the content to delete
    */
-  const handleDeleteClick = async (e, contentId) => {
+  const handleDeleteClick = (e, contentId) => {
     e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this content?")) {
-      try {
-        await deleteDoc(doc(db, "content", contentId));
-        fetchContent(user);
-      } catch (error) {
-        console.error("Error deleting content:", error);
-        setError("Failed to delete content");
-      }
+    setPendingDeleteId(contentId);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    try {
+      await deleteDoc(doc(db, "content", pendingDeleteId));
+      setPendingDeleteId(null);
+      fetchContent(user);
+    } catch (error) {
+      console.error("Error deleting content:", error);
+      setError("Failed to delete content");
     }
   };
 
@@ -356,6 +359,27 @@ export default function Dashboard() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteId && (
+        <div className="modal-overlay" onClick={() => setPendingDeleteId(null)}>
+          <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header delete-confirm-header">
+              <button className="modal-close" onClick={() => setPendingDeleteId(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="delete-confirm-message">Are you sure you want to delete this content?</p>
+              <div className="modal-actions delete-confirm-actions">
+                <button type="button" className="btn-cancel" onClick={() => setPendingDeleteId(null)}>
+                  Cancel
+                </button>
+                <button type="button" className="btn-save" onClick={handleConfirmDelete}>
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>

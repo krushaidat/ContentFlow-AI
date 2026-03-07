@@ -3,12 +3,16 @@ import { fetchTemplates, deleteTemplate } from "../../functions/templateDB";
 import CreateTemplate from "../../functions/CreateTemplate";
 import "../styles/templatesPage.css";
 
+// Aminah: This is the main Templates page component that displays a list of templates, allows users to search, create, edit, and delete templates. 
+
 export default function TemplatesPage() {
 
   const [templates, setTemplates] = useState([]);
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+
+  // Aminah: The loadTemplates function fetches the list of templates from the database and updates the templates state. 
 
   const loadTemplates = async () => {
     try {
@@ -23,12 +27,15 @@ export default function TemplatesPage() {
     loadTemplates();
   }, []);
 
+  // Aminah: The handleEditClick function is called when the edit button is clicked for a template. It sets the editingTemplate state to the selected template and opens the CreateTemplate modal in edit mode. 
+
   const handleEditClick = (e, item) => {
     e.stopPropagation();
     setEditingTemplate(item);
     setIsCreateOpen(true);
   };
 
+  // Aminah: The handleDeleteClick function is called when the delete button is clicked for a template. It deletes the template from the database and reloads the templates list to reflect the changes.
   const handleDeleteClick = async (e, itemId) => {
     e.stopPropagation();
     try {
@@ -39,16 +46,21 @@ export default function TemplatesPage() {
     }
   };
 
+  // Aminah: The handleOpenCreate function is called when the "Create Template" button is clicked. It resets the editingTemplate state and opens the CreateTemplate modal in create mode.
   const handleOpenCreate = () => {
     setEditingTemplate(null);
     setIsCreateOpen(true);
   };
+
+  // Aminah: The filteredTemplates variable computes the list of templates that match the search query based on their title or content. This allows users to easily find specific templates by typing keywords in the search input.
 
   const filteredTemplates = templates.filter(
     (t) =>
       t.title?.toLowerCase().includes(search.toLowerCase()) ||
       t.content?.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Aminah: The return statement renders the Templates page UI, including the header, search input, list of templates, and the CreateTemplate modal. Each template card displays the template's icon, title, description, and action buttons for editing and deleting the template.
 
   return (
     <div className="templates-page">
@@ -80,14 +92,14 @@ export default function TemplatesPage() {
           filteredTemplates.map((item) => (
             <div key={item.id} className="template-card">
 
-              <div className="template-title-row">
-                <div className="template-card-icon">
-                  <span role="img" aria-label="Template icon">{item.icon || "📄"}</span>
-                </div>
-                <div className="template-title">{item.title}</div>
+              <div className="template-card-icon">
+                <span role="img" aria-label="Template icon">{item.icon || "📄"}</span>
               </div>
 
-              <div className="template-desc">{item.structure || item.content}</div>
+              <div className="template-card-body">
+                <div className="template-title">{item.title}</div>
+                <div className="template-desc">{item.structure || item.content}</div>
+              </div>
 
               <div className="template-actions">
                 <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">

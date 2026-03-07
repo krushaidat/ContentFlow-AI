@@ -82,23 +82,40 @@
 .manage-template-card-actions {
 	order: 2;
 	display: flex;
-	gap: 12px;
+	gap: 8px;
 	margin-left: auto;
 }
 
-.manage-template-card-actions button {
+.icon-btn {
 	background: none;
 	border: none;
-	color: #6a5ca8;
-	font-size: 1.1rem;
 	cursor: pointer;
-	padding: 4px 8px;
-	border-radius: 6px;
-	transition: background 0.2s;
+	padding: 6px;
+	border-radius: 4px;
+	transition: all 0.2s;
+	color: #6b7280;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
-.manage-template-card-actions button:hover {
-	background: #ece8ff;
+.icon-btn:hover {
+	background-color: #f3f4f6;
+}
+
+.icon-btn.edit:hover {
+	color: #7c3aed;
+	background-color: #ede9fe;
+}
+
+.icon-btn.delete:hover {
+	color: #dc2626;
+	background-color: #fee2e2;
+}
+
+.icon-btn svg {
+	width: 18px;
+	height: 18px;
 }
 
 .manage-template-card-date {
@@ -201,6 +218,7 @@
   width: 100%;
   padding: 10px 16px;
   background: #f7f6ff;
+	color: #000;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
@@ -218,6 +236,12 @@
   position: absolute;
   right: 24px;
   top: 24px;
+}
+
+.manage-templates-search {
+	color: #000;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

@@ -26,6 +26,8 @@
 .templates-search {
   width: 100%;
   padding: 12px;
+  background: #fff;
+  color: #000;
   border-radius: 6px;
   border: 1px solid #d1d5db;
   font-size: 15px;
@@ -102,6 +104,7 @@
 .btn-template-select:hover {
   background: #6d28d9;
 }
+.modal-overlay,
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -115,6 +118,7 @@
   z-index: 1000;
 }
 
+.modal-content,
 .modal-content {
   background: white;
   border-radius: 8px;
@@ -137,6 +141,7 @@
   }
 }
 
+.modal-header,
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -145,6 +150,7 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+.modal-header h2,
 .modal-header h2 {
   margin: 0;
   font-size: 20px;
@@ -152,6 +158,7 @@
   color: #111827;
 }
 
+.modal-close,
 .modal-close {
   background: none;
   border: none;
@@ -168,11 +175,13 @@
   transition: background-color 0.2s, color 0.2s;
 }
 
+.modal-close:hover,
 .modal-close:hover {
   background-color: #f3f4f6;
   color: #111827;
 }
 
+.create-content-form,
 .create-content-form {
   padding: 24px;
   display: flex;
@@ -180,18 +189,23 @@
   gap: 20px;
 }
 
+.form-group,
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+.form-group label,
 .form-group label {
   font-size: 14px;
   font-weight: 500;
   color: #374151;
 }
 
+.form-group input,
+.form-group textarea,
+.form-group select,
 .form-group input,
 .form-group textarea,
 .form-group select {
@@ -205,6 +219,9 @@
 
 .form-group input:focus,
 .form-group textarea:focus,
+.form-group select:focus,
+.form-group input:focus,
+.form-group textarea:focus,
 .form-group select:focus {
   outline: none;
   border-color: #7c3aed;
@@ -213,17 +230,37 @@
 
 .form-group input:disabled,
 .form-group textarea:disabled,
+.form-group select:disabled,
+.form-group input:disabled,
+.form-group textarea:disabled,
 .form-group select:disabled {
   background-color: #f3f4f6;
   color: #9ca3af;
   cursor: not-allowed;
 }
 
+.form-group textarea,
 .form-group textarea {
   resize: vertical;
   min-height: 150px;
 }
 
+.create-template-form #text,
+.create-template-form #stage,
+.create-content-form #title,
+.create-content-form #text,
+.create-content-form #stage {
+  background: #fff;
+  color: #000;
+}
+
+.create-template-form #stage option,
+.create-content-form #stage option {
+  background: #fff;
+  color: #000;
+}
+
+.error-message,
 .error-message {
   padding: 12px;
   background-color: #fee2e2;
@@ -233,6 +270,7 @@
   border-left: 4px solid #dc2626;
 }
 
+.modal-actions,
 .modal-actions {
   display: flex;
   gap: 12px;
@@ -241,6 +279,8 @@
   border-top: 1px solid #e5e7eb;
 }
 
+.btn-cancel,
+.btn-submit,
 .btn-cancel,
 .btn-submit {
   padding: 10px 20px;
@@ -252,24 +292,30 @@
   border: none;
 }
 
+.btn-cancel,
 .btn-cancel {
   background-color: #f3f4f6;
   color: #374151;
 }
 
+.btn-cancel:hover:not(:disabled),
 .btn-cancel:hover:not(:disabled) {
   background-color: #e5e7eb;
 }
 
+.btn-submit,
 .btn-submit {
   background-color: #7c3aed;
   color: white;
 }
 
+.btn-submit:hover:not(:disabled),
 .btn-submit:hover:not(:disabled) {
   background-color: #6d28d9;
 }
 
+.btn-cancel:disabled,
+.btn-submit:disabled,
 .btn-cancel:disabled,
 .btn-submit:disabled {
   opacity: 0.6;
@@ -315,12 +361,14 @@
   flex-direction: column; /* stack content vertically */
   justify-content: space-between;
   gap: 12px;
+  height: 250px;
   padding: 14px;
   border-radius: 8px;
   border: 1px solid #eef2ff;
   background: linear-gradient(180deg, #ffffff, #fbfbff);
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  overflow: hidden;
 }
 
 .template-card:hover {

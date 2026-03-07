@@ -43,18 +43,20 @@ export default function ManageTemplates({ isOpen, onClose }) {
 
 
   // Aminah: The handleEdit function currently just shows an alert with the template ID, but in a real application, it would likely open an edit form or navigate to an edit page. The handleDelete function updates the templates state by filtering out the deleted template based on its ID.
-  const handleEdit = (template) => {
-    setEditingTemplate(template);
+  const handleEditClick = (e, item) => {
+    e.stopPropagation();
+    setEditingTemplate(item);
     setIsCreateOpen(true);
   };
 
-  const handleDelete = async (id) => {
-  try {
-    await deleteTemplate(id);
-    loadTemplates();
-  } catch (error) {
-    console.error("Delete failed:", error);
-  }
+  const handleDeleteClick = async (e, itemId) => {
+    e.stopPropagation();
+    try {
+      await deleteTemplate(itemId);
+      loadTemplates();
+    } catch (error) {
+      console.error("Delete failed:", error);
+    }
   };
 
   // Aminah: The component returns a modal overlay that contains the list of templates. It includes a search input for filtering templates and displays each template with its name, description, last modified date, and action buttons for editing and deleting. 
@@ -89,13 +91,6 @@ export default function ManageTemplates({ isOpen, onClose }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <button
-            className="dashboard-card-btn"
-            onClick={() => setShowCreateModal(true)}
-            style={{ whiteSpace: "nowrap" }}
-          >
-            + Add Template
-          </button>
         </div>
 
         <div className="manage-templates-list">
@@ -104,26 +99,27 @@ export default function ManageTemplates({ isOpen, onClose }) {
               No templates found.
             </div>
           ) : (
-            filteredTemplates.map((template) => (
-              <div key={template.id} className="manage-template-card">
+            filteredTemplates.map((item) => (
+              <div key={item.id} className="manage-template-card">
                 <div className="manage-template-card-icon">
+                  <span role="img" aria-label="Template icon">{item.icon || "📄"}</span>
                 </div>
 
                 <div className="manage-template-card-body">
                   <div className="manage-template-card-title">
-                    {template.title}
+                    {item.title}
                   </div>
                   <div className="manage-template-card-desc">
-                    {template.content}
+                    {item.content}
                   </div>
                 </div>
 
                 <div className="manage-template-card-actions">
-                  <button onClick={() => handleEdit(template)}>
-                    Edit
+                  <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
-                  <button onClick={() => handleDelete(template.id)}>
-                    Delete
+                  <button className="icon-btn delete" onClick={(e) => handleDeleteClick(e, item.id)} title="Delete">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
                 </div>
               </div>

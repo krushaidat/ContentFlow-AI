@@ -1,69 +1,81 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 
 const CreateTemplate = ({
   isOpen,
   onClose,
   onSuccess,
+  existingTemplate = null,
   mode = "create",
   initialTemplate = null,
 }) => {
+  const templateToEdit = initialTemplate || existingTemplate;
+  const isEditMode = mode === "edit" || Boolean(templateToEdit?.id);
+
   const [title, setTitle] = useState("");
-  const [sections, setSections] = useState("");
+  const [requiredSections, setRequiredSections] = useState("");
   const [structure, setStructure] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const auth = getAuth();
 
-  /** DRAVEN: Fetch existing template data if editing. If creating, fields are reset to empty. */
   useEffect(() => {
-    if (existingTemplate) {
-      setTitle(existingTemplate.title || "");
-      setRequiredSections(existingTemplate.requiredSections || "");
-      setStructure(existingTemplate.structure || "");
+    if (!isOpen) return;
+
+    if (isEditMode && templateToEdit) {
+      setTitle(templateToEdit.title || "");
+      setRequiredSections(templateToEdit.requiredSections || "");
+      setStructure(templateToEdit.structure || templateToEdit.content || "");
     } else {
       setTitle("");
       setRequiredSections("");
       setStructure("");
     }
-  }, [existingTemplate]);
 
-  /** DRAVEN: Handle form submission for creating or updating a template */
+    setError(null);
+    setSuccess(false);
+  }, [isOpen, isEditMode, templateToEdit]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
-    if (!title.trim() || !requiredSections.trim() || !structure.trim()) {
+    const trimmedTitle = title.trim();
+    const trimmedSections = requiredSections.trim();
+    const trimmedStructure = structure.trim();
+
+    if (!trimmedTitle || !trimmedSections || !trimmedStructure) {
       setError("Please fill in all fields.");
       return;
     }
 
     setLoading(true);
     try {
-      if (existingTemplate) {
-        await updateDoc(doc(db, "templates", existingTemplate.id), {
-          title,
-          requiredSections,
-          structure,
-          lastModified: new Date().toLocaleDateString(),
-        });
+      const payload = {
+        title: trimmedTitle,
+        requiredSections: trimmedSections,
+        structure: trimmedStructure,
+        content: trimmedStructure,
+        icon: "📄",
+        lastModified: new Date().toLocaleDateString(),
+      };
+
+      if (isEditMode && templateToEdit?.id) {
+        await updateDoc(doc(db, "templates", templateToEdit.id), payload);
       } else {
-        await addDoc(collection(db, "templates"), {
-          title,
-          requiredSections,
-          structure,
-          lastModified: new Date().toLocaleDateString(),
-          createdBy: auth.currentUser.uid,
-        });
+        await addDoc(collection(db, "templates"), payload);
       }
+
       setSuccess(true);
-      onSuccess();
+      onSuccess?.();
     } catch (err) {
       console.error("Error saving template:", err);
-      setError("Failed to save template. Please try again.");
+      setError(
+        isEditMode
+          ? "Failed to update template. Please try again."
+          : "Failed to create template. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -75,7 +87,7 @@ const CreateTemplate = ({
     setStructure("");
     setError(null);
     setSuccess(false);
-    onClose();
+    onClose?.();
   };
 
   if (!isOpen) return null;
@@ -84,14 +96,18 @@ const CreateTemplate = ({
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{existingTemplate ? "Edit Template" : "Create New Template"}</h2>
-          <button className="modal-close" onClick={handleClose} aria-label="Close modal">×</button>
+          <h2>{isEditMode ? "Edit Template" : "Create New Template"}</h2>
+          <button className="modal-close" onClick={handleClose} aria-label="Close modal">
+            ×
+          </button>
         </div>
 
         {success ? (
           <div style={{ padding: 32, textAlign: "center" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-            <h3 style={{ marginBottom: 8, color: "#111827" }}>{existingTemplate ? "Template Updated!" : "Template Created!"}</h3>
+            <h3 style={{ marginBottom: 8, color: "#111827" }}>
+              {isEditMode ? "Template Updated!" : "Template Created!"}
+            </h3>
             <p style={{ color: "#6b7280", marginBottom: 24 }}>
               Your template <strong>{title}</strong> has been saved successfully.
             </p>
@@ -117,10 +133,11 @@ const CreateTemplate = ({
               <label htmlFor="template-sections">Sections</label>
               <textarea
                 id="template-sections"
-                value={sections}
-                onChange={(e) => setSections(e.target.value)}
+                value={requiredSections}
+                onChange={(e) => setRequiredSections(e.target.value)}
                 placeholder="Enter template sections (e.g. Introduction, Body, Conclusion)"
                 rows="4"
+                style={{ background: "#fff", color: "#000" }}
                 disabled={loading}
               />
             </div>
@@ -133,6 +150,7 @@ const CreateTemplate = ({
                 onChange={(e) => setStructure(e.target.value)}
                 placeholder="Describe the structure of this template"
                 rows="4"
+                style={{ background: "#fff", color: "#000" }}
                 disabled={loading}
               />
             </div>
@@ -148,14 +166,14 @@ const CreateTemplate = ({
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="btn-submit"
-                disabled={loading}
-              >
+              <button type="submit" className="btn-submit" disabled={loading}>
                 {loading
-                  ? (existingTemplate ? "Saving..." : "Creating...")
-                  : (existingTemplate ? "Save Changes" : "Create Template")}
+                  ? isEditMode
+                    ? "Saving..."
+                    : "Creating..."
+                  : isEditMode
+                  ? "Save Changes"
+                  : "Create Template"}
               </button>
             </div>
           </form>
