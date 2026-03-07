@@ -360,26 +360,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* In your edit modal */}
-      {isModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{editingId ? 'Edit Content' : 'Create New Content'}</h3>
-              <button className="modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              {editingContent.rejectionReason && (
-                <div className="rejection-feedback-alert">
-                  <strong>Reviewer Feedback:</strong>
-                  <p>{editingContent.rejectionReason}</p>
-                </div>
-              )}
-              
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
