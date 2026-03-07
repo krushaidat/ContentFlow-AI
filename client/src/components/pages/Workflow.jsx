@@ -19,6 +19,7 @@ import {
   limit,
   updateDoc,
   doc,
+  getDoc,
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useAuth } from "../../hooks/useAuth";
@@ -80,6 +81,7 @@ const Workflow = () => {
   const [selectedReviewer, setSelectedReviewer] = useState(null);
   const [assigningReviewer, setAssigningReviewer] = useState(false);
   const [reviewerError, setReviewerError] = useState("");
+  const [currentReviewerName, setCurrentReviewerName] = useState(null);
 
   // UI states
   const [loading, setLoading] = useState(false);
@@ -284,6 +286,36 @@ const Workflow = () => {
       fetchReviewers();
     }
   }, [selectedStage, user?.role, user?.uid]);
+
+  /**
+   * Fetch reviewer name when selectedContent changes
+   */
+  useEffect(() => {
+    const fetchReviewerName = async () => {
+      if (!selectedContent?.reviewerId) {
+        setCurrentReviewerName(null);
+        return;
+      }
+
+      try {
+        const reviewerDoc = await getDoc(doc(db, "Users", selectedContent.reviewerId));
+        if (reviewerDoc.exists()) {
+          const reviewerData = reviewerDoc.data();
+          const reviewerName = reviewerData.firstName && reviewerData.lastName 
+            ? `${reviewerData.firstName} ${reviewerData.lastName}`
+            : reviewerData.name || reviewerData.email || "Unknown Reviewer";
+          setCurrentReviewerName(reviewerName);
+        } else {
+          setCurrentReviewerName("Reviewer Not Found");
+        }
+      } catch (error) {
+        console.error("Error fetching reviewer name:", error);
+        setCurrentReviewerName("Unable to Load");
+      }
+    };
+
+    fetchReviewerName();
+  }, [selectedContent?.reviewerId]);
 
   return (
     <div className="workflow-bg">
@@ -571,7 +603,7 @@ const Workflow = () => {
                     {selectedContent.reviewerId ? (
                       <div className="reviewer-assigned">
                         <span className="reviewer-badge">✓ Assigned</span>
-                        <div className="reviewer-id-text">ID: {selectedContent.reviewerId}</div>
+                        <div className="reviewer-id-text">{currentReviewerName} ({selectedContent.reviewerId})</div>
                       </div>
                     ) : (
                       <div className="reviewer-unassigned">

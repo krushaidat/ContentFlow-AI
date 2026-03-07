@@ -213,9 +213,9 @@ exports.assignReviewerToContent = async (req, res) => {
       return res.status(403).json({ error: "Reviewer does not belong to this team" });
     }
 
-    if (reviewerData.role !== "reviewer" && reviewerData.role !== "admin") {
+    if (reviewerData.role !== "reviewer") {
       console.log("ERROR: User is not a reviewer, role:", reviewerData.role);
-      return res.status(403).json({ error: "User must have reviewer or admin role" });
+      return res.status(403).json({ error: "Only users with reviewer role can be assigned as reviewers" });
     }
 
     // Verify the content exists
