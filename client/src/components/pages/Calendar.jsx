@@ -161,7 +161,7 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* TA: Event status legend */
+      {/* TA: Event status legend */}
       <div className="calendar-legend">
         <div className="legend-item"><span className="legend-badge legend-idea"></span><span>Idea / Suggestion</span></div>
         <div className="legend-item"><span className="legend-badge legend-scheduled"></span><span>Scheduled Post</span></div>
