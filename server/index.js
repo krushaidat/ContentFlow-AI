@@ -9,6 +9,8 @@ console.log("Loading dotenv...");
 require("dotenv").config();
 console.log("✓ Dotenv loaded");
 
+const PORT = process.env.PORT || 5000;
+
 console.log("Loading Firebase config...");
 const db = require("./config/firebase");
 console.log("✓ Firebase loaded");

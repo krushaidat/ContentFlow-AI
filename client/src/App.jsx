@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -14,6 +14,8 @@ import Workflow from "./components/pages/Workflow";
 import Templates from "./components/pages/Templates";
 import Login from "./components/pages/Login";
 import Signup from "./components/pages/Signup";
+import ReviewPage from "./components/pages/Review";
+import Team from "./components/pages/Team";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -113,6 +115,28 @@ function App() {
                   displayName={displayName}
                 >
                   <Templates />
+                </Layout>
+              }
+            />
+            <Route
+              path="/review"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <ReviewPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/team"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <Team />
                 </Layout>
               }
             />

@@ -1,4 +1,16 @@
 @import "./components/styles/variables.css";
+/* Abdalaa: These global rules ensure the entire application
+   shares the same background color. Without this, the body
+   background can appear when scrolling which caused the
+   black space issue seen earlier. */
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  background: #f5f3ff;
+}
 html, body, #root {
   min-height: 100%;
   margin: 0;

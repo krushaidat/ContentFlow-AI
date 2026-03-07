@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 
 const CreateTemplate = ({
@@ -20,6 +21,7 @@ const CreateTemplate = ({
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
+  /** DRAVEN: Fetch existing template data if editing. If creating, fields are reset to empty. */
   useEffect(() => {
     if (!isOpen) return;
 
