@@ -17,6 +17,13 @@ const ReviewPage = () => {
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
 
+  /**DRAVEN
+   * Loads all content items assigned to the logged-in reviewer.
+   * - Reads Firestore "content" collection
+   * - Filters by reviewerId == current user uid
+   * - Sorts newest first for better reviewer workflow
+   * - Updates loading/error state for UI feedback
+   */
   const fetchAssignedContent = useCallback(async () => {
     if (!user?.uid) return;
 
@@ -43,6 +50,10 @@ const ReviewPage = () => {
     }
   }, [user?.uid]);
 
+  /**DRAVEN
+   * Triggers initial load and reloads when reviewer identity/role changes.
+   * Access is restricted to users with reviewer role.
+   */
   useEffect(() => {
     if (user?.role === 'reviewer' && user?.uid) {
       fetchAssignedContent();
@@ -51,11 +62,20 @@ const ReviewPage = () => {
     }
   }, [user?.role, user?.uid, fetchAssignedContent]);
 
+  /**DRAVEN
+   * Opens the detail modal for a selected content item.
+   * @param {Object} item - Content item to preview/review.
+   */
   const handleView = (item) => {
     setViewingItem(item);
     setShowViewModal(true);
   };
 
+  /**DRAVEN
+   * Approves a content item and moves it to "Ready to Post".
+   * Also stores review metadata and updates local list state.
+   * @param {string} itemId - Firestore document id for the content item.
+   */
   const handleApprove = async (itemId) => {
     try {
       setUpdatingId(itemId);
@@ -66,7 +86,6 @@ const ReviewPage = () => {
         reviewStatus: 'approved'
       });
       
-      // Update local state
       setAssignedItems(assignedItems.map(item => 
         item.id === itemId 
           ? { ...item, stage: 'Ready to Post', reviewStatus: 'approved' }
@@ -81,6 +100,10 @@ const ReviewPage = () => {
     }
   };
 
+  /**DRAVEN
+   * Submits rejection feedback and moves item back to "Update" stage.
+   * Requires non-empty feedback to ensure actionable comments for author.
+   */
   const handleRejectSubmit = async () => {
     if (!rejectReason.trim()) {
       alert('Please provide a reason for rejection.');
@@ -104,7 +127,6 @@ const ReviewPage = () => {
         rejectionReason: rejectReason
       });
       
-      // Update local state
       setAssignedItems(assignedItems.map(item => 
         item.id === itemId 
           ? { ...item, stage: 'Update', reviewStatus: 'rejected', rejectionReason: rejectReason }
@@ -123,6 +145,12 @@ const ReviewPage = () => {
     }
   };
 
+  /**DRAVEN
+   * Maps a stage value to its badge CSS class.
+   * Keeps stage-style mapping centralized for consistent UI.
+   * @param {string} stage
+   * @returns {string} badge class name
+   */
   const getStatusBadgeClass = (stage) => {
     const statusMap = {
       draft: "badge-draft",
@@ -134,6 +162,11 @@ const ReviewPage = () => {
     return statusMap[stage?.toLowerCase()] || "badge-draft";
   };
 
+  /**DRAVEN
+   * Formats ISO/timestamp values for card metadata display.
+   * @param {string|number|Date} dateString
+   * @returns {string} human-readable date
+   */
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",

@@ -4,6 +4,15 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GEMINI_MODEL = 'gemini-2.0-flash'; // updated model
 
+/**DRAVEN
+ * Picks a fallback reviewer when AI assignment is unavailable.
+ * Strategy:
+ * 1) Prefer reviewers marked available
+ * 2) Prefer lowest currentLoad
+ * 3) Randomly pick among ties
+ * @param {Array<Object>} reviewers
+ * @returns {string|null} reviewer uid or null if none
+ */
 const pickRandomReviewer = (reviewers = []) => {
   if (!reviewers.length) return null;
 
@@ -18,6 +27,13 @@ const pickRandomReviewer = (reviewers = []) => {
   return chosen?.uid ?? null;
 };
 
+/**DRAVEN
+ * Uses Gemini to select the best reviewer for a content item.
+ * Falls back to pickRandomReviewer on rate limits/errors/parse failures.
+ * @param {Object} contentItem - Content being assigned.
+ * @param {Array<Object>} availableReviewers - Candidate reviewer list.
+ * @returns {Promise<string|null>} reviewer uid or null.
+ */
 export const assignReviewerWithGemini = async (contentItem, availableReviewers) => {
   try {
     if (!GEMINI_API_KEY) throw new Error('Missing VITE_GEMINI_API_KEY');
@@ -68,6 +84,15 @@ export const assignReviewerWithGemini = async (contentItem, availableReviewers) 
   }
 };
 
+/**DRAVEN
+ * Reads reviewer users from Firestore.
+ * Filters users by role = "reviewer".
+ * @param {any} db
+ * @param {Function} collection
+ * @param {Function} query
+ * @param {Function} getDocs
+ * @returns {Promise<Array<Object>>} normalized reviewer records
+ */
 export const getAvailableReviewers = async (db, collection, query, getDocs) => {
   try {
     const q = query(collection(db, 'Users'), where('role', '==', 'reviewer'));

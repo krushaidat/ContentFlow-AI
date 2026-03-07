@@ -7,13 +7,15 @@ import projectsIcon from "../../assets/projects.png";
 import toolsIcon from "../../assets/tools.png";
 import settingIcon from "../../assets/setting.png";
 import helpIcon from "../../assets/help.png";
+import teamIcon from "../../assets/teams.png";
 import { useAuth } from "../../hooks/useAuth.js"; 
 
 const routes = [
   { key: "dashboard", label: "Dashboard", path: "/dashboard" },
   { key: "workflow", label: "Workflow", path: "/workflow" },
   { key: "documents", label: "AI Tools", path: "/aitools" },
-  { key: "review", label: "Review", path: "/review", reviewerOnly: true }
+  { key: "review", label: "Review", path: "/review", reviewerOnly: true },
+  { key: "team", label: "Team", path: "/team" }
 ];
 
 const Sidebar = () => {
@@ -52,6 +54,7 @@ const Sidebar = () => {
             else if (labelKey.includes("work")) icon = workflowIcon;
             else if (labelKey.includes("review")) icon = projectsIcon;
             else if (labelKey.includes("tool") || labelKey.includes("ai")) icon = toolsIcon;
+            else if (labelKey.includes("team")) icon = teamIcon;
 
             return (
               <button
