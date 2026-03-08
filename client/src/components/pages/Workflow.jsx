@@ -23,7 +23,9 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useAuth } from "../../hooks/useAuth";
+import useInPageAlert from "../../hooks/useInPageAlert";
 import { assignReviewerWithGemini, getAvailableReviewers } from "../../utils/geminiReviewerAssignment";
+import InPageAlert from "../InPageAlert";
 import "../styles/workflow.css";
 
 // These stages must match exactly what we store in Firestore
@@ -86,6 +88,7 @@ const Workflow = () => {
   // UI states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { alertState, showAlert, dismissAlert } = useInPageAlert();
 
   /**
    * Fetch content from Firestore
@@ -146,7 +149,7 @@ const Workflow = () => {
    */
   const handleValidateContent = async () => {
     if (!selectedContent) {
-      alert("Please select content to validate");
+      showAlert("Please select content to validate", "warning");
       return;
     }
 
@@ -187,17 +190,17 @@ const Workflow = () => {
         await fetchContent();
 
         if (assignedReviewerId) {
-          alert("Validation passed. Stage updated to Review and reviewer assigned.");
+          showAlert("Validation passed. Stage updated to Review and reviewer assigned.", "success");
         } else {
-          alert("Validation passed. Stage updated to Review, but no reviewer could be assigned.");
+          showAlert("Validation passed. Stage updated to Review, but no reviewer could be assigned.", "warning");
         }
       }
     } else {
-      alert("Validation failed: " + data.error);
+      showAlert("Validation failed: " + data.error, "error");
     }
   } catch (err) {
     console.error("Validation error:", err);
-    alert("Error validating content");
+    showAlert("Error validating content", "error");
   } finally {
     setLoading(false);
   }
@@ -254,7 +257,7 @@ const Workflow = () => {
       }
 
       const data = await response.json();
-      alert(`Reviewer assigned: ${data.reviewerName}`);
+      showAlert(`Reviewer assigned: ${data.reviewerName}`, "success");
       
       // Update the selected content to show the reviewer
       setSelectedContent({
@@ -319,6 +322,7 @@ const Workflow = () => {
 
   return (
     <div className="workflow-bg">
+      <InPageAlert alertState={alertState} onClose={dismissAlert} />
       <div className="workflow-page modern">
         {/* Header Section */}
         <div className="wf-header">

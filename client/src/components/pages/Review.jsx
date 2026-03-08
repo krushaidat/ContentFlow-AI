@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import useInPageAlert from '../../hooks/useInPageAlert';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import InPageAlert from '../InPageAlert';
 import '../styles/dashboard.css';
 import '../styles/review.css';
 
@@ -16,6 +18,7 @@ const ReviewPage = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const { alertState, showAlert, dismissAlert } = useInPageAlert();
 
   /**DRAVEN
    * Loads all content items assigned to the logged-in reviewer.
@@ -91,10 +94,10 @@ const ReviewPage = () => {
           ? { ...item, stage: 'Ready to Post', reviewStatus: 'approved' }
           : item
       ));
-      alert('Content approved successfully!');
+      showAlert('Content approved successfully!', 'success');
     } catch (err) {
       console.error("Error approving content:", err);
-      alert('Failed to approve content.');
+      showAlert('Failed to approve content.', 'error');
     } finally {
       setUpdatingId(null);
     }
@@ -106,14 +109,14 @@ const ReviewPage = () => {
    */
   const handleRejectSubmit = async () => {
     if (!rejectReason.trim()) {
-      alert('Please provide a reason for rejection.');
+      showAlert('Please provide a reason for rejection.', 'warning');
       return;
     }
 
     const itemId = selectedItemId || viewingItem?.id; // Use viewingItem.id as fallback
 
     if (!itemId) {
-      alert('Error: Could not identify item to reject.');
+      showAlert('Error: Could not identify item to reject.', 'error');
       return;
     }
 
@@ -136,10 +139,10 @@ const ReviewPage = () => {
       setShowRejectModal(false);
       setRejectReason('');
       setSelectedItemId(null);
-      alert('Content rejected with feedback.');
+      showAlert('Content rejected with feedback.', 'success');
     } catch (err) {
       console.error("Error rejecting content:", err);
-      alert('Failed to reject content.');
+      showAlert('Failed to reject content.', 'error');
     } finally {
       setUpdatingId(null);
     }
@@ -183,6 +186,7 @@ const ReviewPage = () => {
 
   return (
     <div className="dashboard-main">
+      <InPageAlert alertState={alertState} onClose={dismissAlert} />
       <h2 className="dashboard-section-title">My Assigned Reviews</h2>
 
       {error && <div className="error-alert">{error}</div>}
