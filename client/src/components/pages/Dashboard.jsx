@@ -4,7 +4,9 @@ import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy }
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
+import CreateTemplate from "../../functions/CreateTemplate";
 import "../styles/dashboard.css";
+import ManageTemplates from "../ManageTemplates";
 
 export default function Dashboard() {
   const [content, setContent] = useState([]);
@@ -14,7 +16,9 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
-  const [editingContent, setEditingContent] = useState({ title: "", text: "", status: "Draft" });
+  const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const auth = getAuth();
   /** DRAVEN
@@ -28,6 +32,8 @@ export default function Dashboard() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       if (user) {
+        // Only fetch content if user is authenticated
+        // Prevents "User not authenticated" errors
         fetchContent();
       } else {
         setLoading(false);
@@ -44,6 +50,17 @@ export default function Dashboard() {
    * @param {*} user - The authenticated user object.
    * @returns {Promise<void>} - A promise that resolves when the content is fetched.
    */
+  /**
+   * Tanvir- fetchContent - Fixes user permissions & security rules compliance
+   * 
+   - Fetches content from Firestore filtered by:
+   - Fetches only the currently logged-in user's content from Firestore.
+   - Filters by 'createdBy' field matching the user's UID to comply with Firestore security rules.
+   * 
+   * Removed orderBy("createdAt") to avoid requiring a composite index in Firestore.
+   * Instead, sorting is done client-side after fetching to improve performance and reduce quota errors.
+   - This ensures users can only access their own content, enforcing data privacy and security.
+   */
   const fetchContent = async (user) => {
     const currentUser = user || auth.currentUser;
     if (!currentUser) {
@@ -53,12 +70,19 @@ export default function Dashboard() {
     }
     try {
       setLoading(true);
-      const q = query(collection(db, "content"), orderBy("createdAt", "desc"));
+      // Security fix: Filter by createdBy to only fetch user's own content
+      // This matches Firestore security rules that allow reading only own documents
+      const q = query(
+        collection(db, "content"),
+        where("createdBy", "==", currentUser.uid)
+      );
       const querySnapshot = await getDocs(q);
+      // Performance fix: Sort on client-side instead of orderBy in query
+      // Avoids needing a composite index and reduces quota errors
       const items = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      }));
+      })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setContent(items);
       setError(null);
     } catch (err) {
@@ -71,10 +95,10 @@ export default function Dashboard() {
 
   /**
    * Returns the appropriate CSS class name for a status badge
-   * based on the content's current status (draft, planning, review, etc.)
-   * This function maps each status to its corresponding color scheme
+   * based on the content's current stage (draft, planning, review, etc.)
+   * This function maps each stage to its corresponding color scheme
    */
-  const getStatusBadgeClass = (status) => {
+  const getStatusBadgeClass = (stage) => {
     const statusMap = {
       draft: "badge-draft",
       planning: "badge-planning",
@@ -82,7 +106,7 @@ export default function Dashboard() {
       update: "badge-update",
       "ready-to-post": "badge-ready",
     };
-    return statusMap[status?.toLowerCase()] || "badge-draft";
+    return statusMap[stage?.toLowerCase()] || "badge-draft";
   };
 
   /**
@@ -112,29 +136,31 @@ export default function Dashboard() {
     setEditingContent({
       title: item.title,
       text: item.text,
-      status: item.status,
+      stage: item.stage,
     });
   };
 
   /**
    * Handles when the user clicks the delete icon on a content card
    - Stops the click from bubbling up
-   - Shows a confirmation dialog to prevent accidental deletion
-   - If confirmed, deletes the content from Firestore database
-   - Refreshes the content list after successful deletion
+   - Opens a confirmation popup to prevent accidental deletion
    * @param {Event} e - The click event
    * @param {string} contentId - The ID of the content to delete
    */
-  const handleDeleteClick = async (e, contentId) => {
+  const handleDeleteClick = (e, contentId) => {
     e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this content?")) {
-      try {
-        await deleteDoc(doc(db, "content", contentId));
-        fetchContent(user);
-      } catch (error) {
-        console.error("Error deleting content:", error);
-        setError("Failed to delete content");
-      }
+    setPendingDeleteId(contentId);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    try {
+      await deleteDoc(doc(db, "content", pendingDeleteId));
+      setPendingDeleteId(null);
+      fetchContent(user);
+    } catch (error) {
+      console.error("Error deleting content:", error);
+      setError("Failed to delete content");
     }
   };
 
@@ -150,7 +176,7 @@ export default function Dashboard() {
       await updateDoc(contentRef, {
         title: editingContent.title,
         text: editingContent.text,
-        status: editingContent.status,
+        stage: editingContent.stage,
       });
       setEditingId(null);
       fetchContent(user);
@@ -167,8 +193,17 @@ export default function Dashboard() {
    */
   const handleCloseEdit = () => {
     setEditingId(null);
-    setEditingContent({ title: "", text: "", status: "Draft" });
+    setEditingContent({ title: "", text: "", stage: "Draft" });
   };
+
+  const handleManageTemplates = () => {
+    setShowTemplatesModal(true);
+  };
+  
+  const handleCloseTemplatesModal = () => {
+    setShowTemplatesModal(false);
+  };
+
 
   if (!user && !loading) {
     return (
@@ -180,25 +215,53 @@ export default function Dashboard() {
     );
   }
 
-  //(Tanvir- merge fix): Removed duplicate handleSaveChanges, handleDeleteContent, and undefined state references
-  
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h2>My Content</h2>
-        <button
-          className="btn-create"
-          onClick={() => setIsModalOpen(true)}
-        >
-          + Create Content
-        </button>
+    <div className="dashboard-main">
+      {/* AMINAH: Top section with Create Content and Templates in a horizontal flex container */}
+      <div className="dashboard-top-row">
+        <div className="dashboard-card create-content-card">
+          {/* AMINAH: Create Content card */}
+          <div className="dashboard-card-icon">
+            <span role="img" aria-label="Create Content" style={{fontSize: 32}}>📝</span>
+          </div>
+          <div className="dashboard-card-body">
+            <div className="dashboard-card-title">Create Content</div>
+            <div className="dashboard-card-desc">Start a new post. Choose a template and write your content.</div>
+            <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
+              + Create Content
+            </button>
+          </div>
+        </div>
+        <div className="dashboard-card templates-card">
+          {/* AMINAH: Templates card */}
+          <div className="dashboard-card-icon">
+            <span role="img" aria-label="Templates" style={{fontSize: 32}}>📄</span>
+          </div>
+          <div className="dashboard-card-body">
+            <div className="dashboard-card-title">Templates</div>
+            <div className="dashboard-card-desc">Manage and modify templates to ensure brand consistency.</div>
+            <button className="dashboard-card-btn secondary" onClick={handleManageTemplates}>
+              Manage Templates
+            </button>
+          </div>
+        </div>
       </div>
 
+      {/* AMINAH: CreateContent modal */}
       <CreateContent
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => fetchContent(user)}
       />
+
+      {/* AMINAH: Templates Modal */}
+      <ManageTemplates
+      isOpen={showTemplatesModal}
+      onClose={() => setShowTemplatesModal(false)}
+      />
+
+      {/* AMINAH: Section title */}
+      <h2 className="dashboard-section-title">My Content</h2>
 
       {error && <div className="error-alert">{error}</div>}
 
@@ -209,47 +272,35 @@ export default function Dashboard() {
           <p>No content yet. Create your first piece of content!</p>
         </div>
       ) : (
-        <div className="content-grid">
+        <div className="dashboard-content-list">
           {content.map((item) => (
-            <div key={item.id} className="content-card">
-              <div className="card-header">
-                <h3 className="card-title">{item.title || "Untitled"}</h3>
-                <div className="card-actions">
-                  <button
-                    className="icon-btn edit"
-                    onClick={(e) => handleEditClick(e, item)}
-                    title="Edit"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
+            <div key={item.id} className="dashboard-content-card content-item-box">
+              {/* AMINAH: Content item box container */}
+              <div className="dashboard-content-header">
+                <span className={`dashboard-badge ${getStatusBadgeClass(item.stage)}`}>{item.stage || "Draft"}</span>
+                {/*- Moved edit and delete buttons from `.dashboard-content-actions` at the bottom to `.dashboard-content-header` at the top
+                  - Buttons now positioned at top-right of each card*/}
+                <div className="dashboard-content-actions">
+                  <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
-                  <button
-                    className="icon-btn delete"
-                    onClick={(e) => handleDeleteClick(e, item.id)}
-                    title="Delete"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                  <button className="icon-btn delete" onClick={(e) => handleDeleteClick(e, item.id)} title="Delete">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
                 </div>
               </div>
-              
-              <span className={`badge ${getStatusBadgeClass(item.status)}`}>
-                {item.status || "Draft"}
-              </span>
-              
-              <p className="card-text">
-                {(item.text || "").substring(0, 150)}
-                {item.text?.length > 150 ? "..." : ""}
-              </p>
-              
-              <div className="card-footer">
-                <span className="card-date">
-                  {item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}
-                </span>
+              <div className="content-item-title">{item.title}</div>
+              <div className="content-item-text">{item.text}</div>
+              {item.rejectionReason && (
+                <div className="rejection-reason">
+                  <strong>Feedback:</strong> {item.rejectionReason}
+                </div>
+              )}
+              <div className="content-item-meta">
+                <span className="content-item-stage">Stage: {item.stage}</span>
+                <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
+              <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
             </div>
           ))}
         </div>
@@ -290,11 +341,11 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="form-group">
-                  <label htmlFor="edit-status">Status</label>
+                  <label htmlFor="edit-stage">Stage</label>
                   <select
-                    id="edit-status"
-                    value={editingContent.status}
-                    onChange={(e) => setEditingContent({ ...editingContent, status: e.target.value })}
+                    id="edit-stage"
+                    value={editingContent.stage}
+                    onChange={(e) => setEditingContent({ ...editingContent, stage: e.target.value })}
                     className="edit-select"
                   >
                     <option value="Draft">Draft</option>
@@ -314,6 +365,27 @@ export default function Dashboard() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteId && (
+        <div className="modal-overlay" onClick={() => setPendingDeleteId(null)}>
+          <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header delete-confirm-header">
+              <button className="modal-close" onClick={() => setPendingDeleteId(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="delete-confirm-message">Are you sure you want to delete this content?</p>
+              <div className="modal-actions delete-confirm-actions">
+                <button type="button" className="btn-cancel" onClick={() => setPendingDeleteId(null)}>
+                  Cancel
+                </button>
+                <button type="button" className="btn-save" onClick={handleConfirmDelete}>
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>

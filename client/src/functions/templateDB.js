@@ -1,4 +1,4 @@
-import {collection, addDoc, getDocs, doc, deleteDoc} from 'firebase/firestore'
+import {collection, addDoc, getDocs, doc, deleteDoc, updateDoc} from 'firebase/firestore'
 import {db} from '../firebase/'
 
 /** DRAVEN
@@ -48,6 +48,25 @@ export const deleteTemplate = async (templateId) => {
         await deleteDoc(doc(db, 'templates', templateId));
     } catch (error) {
         console.error('Error deleting template:', error);
+        throw error;
+    }
+};
+
+/** DRAVEN
+ * Updates an existing template in the Firestore database.
+ * @param {String} templateId - The ID of the template to update.
+ * @param {String} templateTitle - The updated template title.
+ * @param {String} templateContent - The updated template content.
+ * @returns {Promise<void>} - A promise that resolves when the update completes.
+ */
+export const updateTemplate = async (templateId, templateTitle, templateContent) => {
+    try {
+        await updateDoc(doc(db, 'templates', templateId), {
+            title: templateTitle,
+            content: templateContent
+        });
+    } catch (error) {
+        console.error('Error updating template:', error);
         throw error;
     }
 };

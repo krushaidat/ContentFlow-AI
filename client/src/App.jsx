@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -11,8 +11,12 @@ import Profile from "./components/pages/Profile";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./components/pages/Dashboard";
 import Workflow from "./components/pages/Workflow";
+import Templates from "./components/pages/Templates";
+import Calendar from "./components/pages/Calendar";
 import Login from "./components/pages/Login";
 import Signup from "./components/pages/Signup";
+import ReviewPage from "./components/pages/Review";
+import Team from "./components/pages/Team";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -101,6 +105,50 @@ function App() {
                   displayName={displayName}
                 >
                   <Workflow />
+                </Layout>
+              }
+            />
+            <Route
+              path="/templates"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <Templates />
+                </Layout>
+              }
+            />
+            <Route
+              path="/review"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <ReviewPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/team"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <Team />
+                </Layout>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <Calendar />
                 </Layout>
               }
             />
