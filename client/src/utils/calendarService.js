@@ -22,7 +22,7 @@ export const getCalendarData = async () => {
 
     const events = [];
 
-    // Fetch AI Suggestions
+    // Fetch aI Suggestions
     const suggestionsRef = collection(db, "aiSuggestions");
     const suggestionsQuery = query(
       suggestionsRef,
@@ -34,17 +34,25 @@ export const getCalendarData = async () => {
       const data = doc.data();
       events.push({
         id: doc.id,
-        title: data.title || "Untitled",
-        reason: data.reason || "",
-        suggestedDate: data.suggestedDate || new Date(),
-        suggestedTime: data.suggestedTime || "",
-        status: "idea", // AI suggestions are ideas until scheduled
+        title: data.title || data.postTitle || "Untitled",
+        reason: data.reason || data.description || "",
+
+   // Abdalaa: normalize the Firestore date so the calendar
+// can correctly match the event to the right day
+suggestedDate:
+typeof data.date === "string"
+  ? data.date
+  : data.date?.toDate?.().toISOString().split("T")[0] || "",
+
+// Abdalaa: store time exactly how the calendar expects it
+suggestedTime: data.time || "",
+        status: data.slotStatus === "completed" ? "completed" : "scheduled",
         postId: data.postId || "",
         createdAt: data.createdAt || new Date(),
-        source: "aiSuggestion",
+        source: "calendarSlot",
       });
     });
-
+    console.log("Abdalaa calendar events loaded:", events);
     // Fetch Calendar Slots (these are either scheduled or completed posts)
     const slotsRef = collection(db, "calendarSlots");
     const slotsQuery = query(slotsRef, where("userId", "==", user.uid));
@@ -60,7 +68,8 @@ export const getCalendarData = async () => {
           reason: data.description || "",
           suggestedDate: data.date || new Date(),
           suggestedTime: data.time || "",
-          status: data.slotStatus === "completed" ? "completed" : "scheduled",
+// Abdalaa: normalize status so calendar badges render correctly
+          status: data.slotStatus || "scheduled",
           postId: data.postId || "",
           createdAt: data.createdAt || new Date(),
           source: "calendarSlot",
@@ -79,7 +88,7 @@ export const getCalendarData = async () => {
 };
 
 /**
- * Get AI suggestions for a specific date range
+ * Get ai suggestions for a specific date range
  */
 export const getAISuggestionsForDateRange = async (startDate, endDate) => {
   try {

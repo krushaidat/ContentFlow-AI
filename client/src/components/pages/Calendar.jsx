@@ -2,11 +2,15 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/calendar.css";
 import { getCalendarData } from "../../utils/calendarService";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../../firebase";
 
 // TA: Main Calendar component - manages calendar state and rendering with multiple view modes (month/week/day)
 const Calendar = () => {
   const navigate = useNavigate();
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 3, 1));
+// Abdalaa: I changed this so the calendar opens on today's real date
+// instead of being stuck on April 2024.
+const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,32 +22,52 @@ const Calendar = () => {
 
   // TA: Event listeners and data fetching
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target)) {
-        setShowMonthDropdown(false);
+    // Abdalaa: I want the calendar to wait for Firebase auth
+    // before trying to load events from Firestore.
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setEvents([]);
+        setLoading(false);
+        return;
       }
-      if (viewDropdownRef.current && !viewDropdownRef.current.contains(event.target)) {
-        setShowViewDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
-  useEffect(() => {
-    const loadData = async () => {
       try {
         setLoading(true);
         const data = await getCalendarData();
+        console.log("Abdalaa calendar loaded events:", data);
         setEvents(data);
       } catch (error) {
         console.error("Error loading calendar data:", error);
       } finally {
         setLoading(false);
       }
+    });
+
+    const handleFocus = async () => {
+      if (!auth.currentUser) return;
+
+      try {
+        setLoading(true);
+        const data = await getCalendarData();
+        console.log("Abdalaa calendar focus refresh:", data);
+        setEvents(data);
+      } catch (error) {
+        console.error("Error refreshing calendar data:", error);
+      } finally {
+        setLoading(false);
+      }
     };
-    loadData();
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
+
+
+
 
   // TA: Utility functions for date calculations, event filtering, and navigation handling
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -67,13 +91,21 @@ const Calendar = () => {
     return days;
   };
   const getHours = () => Array.from({ length: 24 }, (_, i) => i);
+  // Abdalaa: I changed this to compare plain date strings  so timezone conversion does not mess up matching.
   const getEventsForDate = (day) => {
-    const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toISOString().split("T")[0];
-    return events.filter((event) => new Date(event.suggestedDate).toISOString().split("T")[0] === dateStr);
+    const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+    const dayString = String(day).padStart(2, "0");
+    const dateStr = `${currentDate.getFullYear()}-${month}-${dayString}`;
+
+    return events.filter((event) => event.suggestedDate === dateStr);
   };
+  // Abdalaa: same fix here, keep date matching simple and direct.
   const getEventsForDateObj = (dateObj) => {
-    const dateStr = dateObj.toISOString().split("T")[0];
-    return events.filter((event) => new Date(event.suggestedDate).toISOString().split("T")[0] === dateStr);
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dayString = String(dateObj.getDate()).padStart(2, "0");
+    const dateStr = `${dateObj.getFullYear()}-${month}-${dayString}`;
+
+    return events.filter((event) => event.suggestedDate === dateStr);
   };
   const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
   const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
@@ -131,9 +163,33 @@ const Calendar = () => {
           </button>
           {showMonthDropdown && (
             <div className="dropdown-menu month-dropdown">
-              <div className="dropdown-item">April 2024</div>
-              <div className="dropdown-item">May 2024</div>
-              <div className="dropdown-item">June 2024</div>
+              {[...Array(12)].map((_, index) => {
+                const optionDate = new Date(
+                  currentDate.getFullYear(),
+                  index,
+                  1
+                );
+
+                return (
+                  <div
+                    key={index}
+                    className="dropdown-item"
+                    onClick={() => {
+                      // Abdalaa: this lets me jump directly to a real month
+                      // in the current year instead of using old hardcoded values.
+                      setCurrentDate(
+                        new Date(currentDate.getFullYear(), index, 1)
+                      );
+                      setShowMonthDropdown(false);
+                    }}
+                  >
+                    {optionDate.toLocaleDateString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
