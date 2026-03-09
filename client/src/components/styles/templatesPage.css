@@ -39,13 +39,14 @@ gap:24px;
 display:flex;
 flex-direction:column;
 background:#ffffff;
-padding:24px;
+padding:0;
 border-radius:16px;
 border: 1px solid #f0effb;
 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 transition: transform 0.2s ease, box-shadow 0.2s ease;
 overflow: hidden;
 min-height: 220px;
+max-height: 320px;
 }
 
 .template-card:hover{
@@ -83,6 +84,8 @@ margin-bottom:0;
 color:#6b7280;
 font-size:14px;
 line-height:1.45;
+white-space: pre-wrap;
+overflow-wrap: anywhere;
 }
 
 .template-actions{
@@ -125,19 +128,33 @@ height:18px;
 }
 
 .card-body {
-  padding: 24px;
-  flex-grow: 1;
+  padding: 24px 24px 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.card-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
 }
 
 /* The New Footer Actions */
 .template-actions-footer {
   display: flex;
-  border-top: 0;
+  border-top: 1px solid #f3f4f6;
   background: transparent;
   width: 100%;
-  padding: 10px 0 12px;
+  padding: 10px 24px 12px;
   justify-content: center;
   gap: 48px;
+  flex-shrink: 0;
 }
 
 .action-link {
