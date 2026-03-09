@@ -40,7 +40,7 @@ const handleManualScheduleSubmit = async () => {
 
     setScheduleError(null);
 
-    const response = await fetch("http://localhost:5050/api/ai/manual-schedule", {
+    const response = await fetch("http://localhost:5000/api/ai/manual-schedule", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
