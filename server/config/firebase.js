@@ -13,7 +13,7 @@ function getCredential() {
     });
   }
 
-  const keyPath = FIREBASE_KEY_PATH || path.join(__dirname, "..", "firebase-key.json");
+  const keyPath = FIREBASE_KEY_PATH || path.join(__dirname, "..","..", "firebase-key.json");
   if (!fs.existsSync(keyPath)) {
     throw new Error(`Firebase key not found at: ${keyPath}`);
   }

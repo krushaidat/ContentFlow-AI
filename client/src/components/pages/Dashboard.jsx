@@ -6,7 +6,8 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
 import { decrementTemplateUsage } from "../../functions/templateDB";
 import "../styles/dashboard.css";
-
+import useInPageAlert from "../../hooks/useInPageAlert";
+import InPageAlert from "../InPageAlert";
 
 export default function Dashboard() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -40,7 +41,7 @@ const handleManualScheduleSubmit = async () => {
 
     setScheduleError(null);
 
-    const response = await fetch("http://localhost:5050/api/ai/manual-schedule", {
+    const response = await fetch("http://localhost:5000/api/ai/manual-schedule", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,7 +62,7 @@ const handleManualScheduleSubmit = async () => {
 
     handleCloseScheduleModal();
     await fetchContent(user);
-    alert(`Post scheduled for ${data.date} at ${data.time}`);
+    showAlert(`Post scheduled for ${data.date} at ${data.time}`);
   } catch (error) {
     console.error("Error scheduling post manually:", error);
     setScheduleError(error.message || "Could not schedule post.");
@@ -77,6 +78,7 @@ const handleManualScheduleSubmit = async () => {
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const { alertState, showAlert, dismissAlert } = useInPageAlert();
   // Abdalaa: This keeps track of which content card is currently asking AI
   // for a suggested posting time, so the button can show loading state.
   const [schedulingPostId, setSchedulingPostId] = useState(null);
@@ -273,7 +275,7 @@ const handleManualScheduleSubmit = async () => {
         ? "Gemini picked this time"
         : "Fallback time was used because Gemini was unavailable";
 
-    alert(
+    showAlert(
       `${sourceLabel}\nScheduled for ${data.suggestedDate} at ${data.suggestedTime}`
     );
 
@@ -337,6 +339,7 @@ const handleManualScheduleSubmit = async () => {
 
   return (
     <div className="dashboard-main">
+      <InPageAlert alertState={alertState} onClose={dismissAlert} />
       {/* AMINAH: Top section with Create Content and Templates in a horizontal flex container */}
       <div className="dashboard-top-row">
         <div className="dashboard-card create-content-card">
