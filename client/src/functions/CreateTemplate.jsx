@@ -52,6 +52,10 @@ const CreateTemplate = ({
 
     setLoading(true);
     try {
+      const nowIso = new Date().toISOString();
+      const existingCreatedAt =
+        templateToEdit?.createdAt || templateToEdit?.created_at || nowIso;
+
       const payload = {
         title: trimmedTitle,
         requiredSections: trimmedSections,
@@ -59,12 +63,21 @@ const CreateTemplate = ({
         content: trimmedStructure,
         icon: "📄",
         lastModified: new Date().toLocaleDateString(),
+        lastModifiedAt: nowIso,
+        updatedAt: nowIso,
       };
 
       if (isEditMode && templateToEdit?.id) {
-        await updateDoc(doc(db, "templates", templateToEdit.id), payload);
+        await updateDoc(doc(db, "templates", templateToEdit.id), {
+          ...payload,
+          createdAt: existingCreatedAt,
+        });
       } else {
-        await addDoc(collection(db, "templates"), payload);
+        await addDoc(collection(db, "templates"), {
+          ...payload,
+          createdAt: nowIso,
+          usageCount: 0,
+        });
       }
 
       setSuccess(true);

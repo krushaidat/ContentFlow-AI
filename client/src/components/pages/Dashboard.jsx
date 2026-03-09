@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
-import CreateTemplate from "../../functions/CreateTemplate";
+import { decrementTemplateUsage } from "../../functions/templateDB";
 import "../styles/dashboard.css";
-import ManageTemplates from "../ManageTemplates";
 
 export default function Dashboard() {
   const [content, setContent] = useState([]);
@@ -17,7 +16,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
-  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const auth = getAuth();
@@ -154,8 +153,21 @@ export default function Dashboard() {
 
   const handleConfirmDelete = async () => {
     if (!pendingDeleteId) return;
+
+    const deletedItem = content.find((item) => item.id === pendingDeleteId);
+
     try {
       await deleteDoc(doc(db, "content", pendingDeleteId));
+
+      // If this content used a saved template, decrement its popularity count
+      if (deletedItem?.templateId) {
+        try {
+          await decrementTemplateUsage(deletedItem.templateId);
+        } catch (decErr) {
+          console.warn("Failed to decrement template usage:", decErr);
+        }
+      }
+
       setPendingDeleteId(null);
       fetchContent(user);
     } catch (error) {
@@ -196,12 +208,9 @@ export default function Dashboard() {
     setEditingContent({ title: "", text: "", stage: "Draft" });
   };
 
+  // AMINAH: Navigates to the Templates management page when "Manage Templates" button is clicked
   const handleManageTemplates = () => {
-    setShowTemplatesModal(true);
-  };
-  
-  const handleCloseTemplatesModal = () => {
-    setShowTemplatesModal(false);
+    navigate("/templates");
   };
 
 
@@ -254,11 +263,7 @@ export default function Dashboard() {
         onSuccess={() => fetchContent(user)}
       />
 
-      {/* AMINAH: Templates Modal */}
-      <ManageTemplates
-      isOpen={showTemplatesModal}
-      onClose={() => setShowTemplatesModal(false)}
-      />
+      
 
       {/* AMINAH: Section title */}
       <h2 className="dashboard-section-title">My Content</h2>

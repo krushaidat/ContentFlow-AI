@@ -76,13 +76,14 @@ export default function TemplatesPage() {
         </button>
       </div>
 
-      <div className="templates-toolbar">
-        <input
-          className="templates-search"
-          placeholder="Search templates..."
+      <div className="templates-search-wrapper">
+        <span className="search-icon">🔍</span>
+          <input
+            className="templates-search"
+            placeholder="Search templates..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+          onChange={(e)=>setSearch(e.target.value)}
+         />
       </div>
 
       <div className="templates-list">
