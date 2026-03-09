@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy, addDoc } from "firebase/firestore";import { db } from "../../firebase";
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy, addDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
-import CreateTemplate from "../../functions/CreateTemplate";
+import { decrementTemplateUsage } from "../../functions/templateDB";
 import "../styles/dashboard.css";
-import ManageTemplates from "../ManageTemplates";
+
 
 export default function Dashboard() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -216,8 +217,20 @@ const handleManualScheduleSubmit = async () => {
 
   const handleConfirmDelete = async () => {
     if (!pendingDeleteId) return;
+
+    const deletedItem = content.find((item) => item.id === pendingDeleteId);
+
     try {
       await deleteDoc(doc(db, "content", pendingDeleteId));
+
+      // If this content used a saved template, decrement its popularity count
+      if (deletedItem?.templateId) {
+        try {
+          await decrementTemplateUsage(deletedItem.templateId);
+        } catch (decErr) {
+          console.warn("Failed to decrement template usage:", decErr);
+        }
+      }
       setPendingDeleteId(null);
       fetchContent(user);
     } catch (error) {
@@ -305,12 +318,10 @@ const handleManualScheduleSubmit = async () => {
     setEditingContent({ title: "", text: "", stage: "Draft" });
   };
 
+  // AMINAH: Navigates to the Templates management page when "Manage Templates" button is clicked
+
   const handleManageTemplates = () => {
-    setShowTemplatesModal(true);
-  };
-  
-  const handleCloseTemplatesModal = () => {
-    setShowTemplatesModal(false);
+   navigate("/templates");
   };
 
 
@@ -364,10 +375,7 @@ const handleManualScheduleSubmit = async () => {
       />
 
       {/* AMINAH: Templates Modal */}
-      <ManageTemplates
-      isOpen={showTemplatesModal}
-      onClose={() => setShowTemplatesModal(false)}
-      />
+
 
       {/* AMINAH: Section title */}
       <h2 className="dashboard-section-title">My Content</h2>
