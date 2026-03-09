@@ -14,11 +14,12 @@ margin-bottom:20px;
 
 .templates-search{
 width:100%;
-padding:10px 16px;
-border-radius:8px;
-border:1px solid #ddd;
+padding:12px 16px 12px 40px;
+border-radius:10px;
+border:1px solid #e5e7eb;
 background:white;
-color:#000;
+font-size:14px;
+transition:all .2s;
 }
 
 .templates-search:focus{
@@ -35,22 +36,21 @@ gap:24px;
 }
 
 .template-card{
-  display:flex;
-  flex-direction:column;
-  background:#ffffff;
-  padding:24px;
-  border-radius:14px;
-  border:1px solid #ececff;
-  transition:all 0.2s ease;
-  cursor:pointer;
-  position:relative;
-  min-height:190px;
+display:flex;
+flex-direction:column;
+background:#ffffff;
+padding:24px;
+border-radius:16px;
+border: 1px solid #f0effb;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+transition: transform 0.2s ease, box-shadow 0.2s ease;
+overflow: hidden;
+min-height: 220px;
 }
 
 .template-card:hover{
-transform:translateY(-3px);
-box-shadow:0 10px 24px rgba(0,0,0,0.08);
-border-color:#ddd6fe;
+transform:translateY(-4px);
+box-shadow: 0 12px 24px rgba(124, 58, 237, 0.08);
 }
 
 .template-card-icon{
@@ -74,7 +74,7 @@ margin-bottom:10px;
 
 .template-title{
 font-weight:600;
-font-size:16px;
+font-size:18px;
 color:#111827;
 margin-bottom:0;
 }
@@ -122,4 +122,163 @@ background-color:#fee2e2;
 .icon-btn svg {
 width:18px;
 height:18px;
+}
+
+.card-body {
+  padding: 24px;
+  flex-grow: 1;
+}
+
+/* The New Footer Actions */
+.template-actions-footer {
+  display: flex;
+  border-top: 0;
+  background: transparent;
+  width: 100%;
+  padding: 10px 0 12px;
+  justify-content: center;
+  gap: 48px;
+}
+
+.action-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #4b5563;
+  transition: opacity 0.2s;
+}
+
+.action-icon-bg {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-icon-bg svg {
+  width: 18px;
+  height: 18px;
+}
+
+.edit-bg { background: #ede9fe; color: #7c3aed; }
+.delete-bg { background: #fee2e2; color: #dc2626; }
+
+.template-create-card.primary-accent {
+  background: #f5f3ff;
+  border: 2px solid #ddd6fe;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+.templates-container {
+  padding: 2rem;
+  background: linear-gradient(135deg, #f5f3ff 0%, #f9f5ff 100%);
+  min-height: 100vh;
+}
+
+.templates-toolbar{
+display:flex;
+align-items:center;
+justify-content:space-between;
+margin-bottom:24px;
+}
+
+.templates-search-wrapper{
+position:relative;
+width:700px;
+}
+
+.toolbar-right{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.templates-found{
+  color:#6b7280;
+  font-size:13px;
+  white-space:nowrap;
+}
+
+@media (max-width: 900px) {
+  .templates-search-wrapper{ width:100%; }
+  .templates-toolbar{ flex-direction:column; align-items:flex-start; gap:8px; }
+  .toolbar-right{ width:100%; display:flex; justify-content:space-between; }
+}
+
+
+.search-icon{
+position:absolute;
+left:12px;
+top:50%;
+transform:translateY(-50%);
+color:#9ca3af;
+font-size:15px;
+}
+
+.template-create-card{
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+border:2px dashed #ddd6fe;
+border-radius:14px;
+padding:32px;
+cursor:pointer;
+background:#fafaff;
+transition:all .2s;
+min-height:190px;
+}
+
+.template-create-card:hover{
+background: #ede9fe;
+  border-color: #7c3aed;
+}
+
+.create-icon{
+width:48px;
+height:48px;
+border-radius:12px;
+background:#ede9fe;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:26px;
+color:#7c3aed;
+margin-bottom:10px;
+}
+
+.create-title{
+font-weight:600;
+font-size:16px;
+color:#111827;
+}
+
+.create-sub{
+font-size:13px;
+color:#6b7280;
+margin-top:4px;
+}
+
+.sort-dropdown {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
 }

@@ -1,4 +1,4 @@
-import {collection, addDoc, getDocs, doc, deleteDoc, updateDoc} from 'firebase/firestore'
+import {collection, addDoc, getDocs, doc, deleteDoc, updateDoc, runTransaction} from 'firebase/firestore'
 import {db} from '../firebase/'
 
 /** DRAVEN
@@ -9,9 +9,15 @@ import {db} from '../firebase/'
 */
 export const addTemplate = async (templateTitle, templateContent) => {
     try {
+        const nowIso = new Date().toISOString();
         const docRef = await addDoc(collection(db, 'templates'), {
             title: templateTitle,
-            content: templateContent
+            content: templateContent,
+            usageCount: 0,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            lastModifiedAt: nowIso,
+            lastModified: new Date().toLocaleDateString()
         });
         return docRef.id;
     } catch (error) {
@@ -29,7 +35,15 @@ export const fetchTemplates = async () => {
         const querySnapshot = await getDocs(collection(db, 'templates'));
         const templates = [];
         querySnapshot.forEach((doc) => {
-            templates.push({ id: doc.id, ...doc.data() });
+            const data = doc.data() || {};
+            const usageCount = Number(data.usageCount ?? data.popularity ?? data.views ?? 0) || 0;
+            templates.push({
+                id: doc.id,
+                ...data,
+                usageCount,
+                createdAt: data.createdAt ?? data.created_at ?? null,
+                updatedAt: data.updatedAt ?? data.lastModifiedAt ?? null,
+            });
         });
         return templates;
     } catch (error) {
@@ -61,12 +75,67 @@ export const deleteTemplate = async (templateId) => {
  */
 export const updateTemplate = async (templateId, templateTitle, templateContent) => {
     try {
+        const nowIso = new Date().toISOString();
         await updateDoc(doc(db, 'templates', templateId), {
             title: templateTitle,
-            content: templateContent
+            content: templateContent,
+            updatedAt: nowIso,
+            lastModifiedAt: nowIso,
+            lastModified: new Date().toLocaleDateString()
         });
     } catch (error) {
         console.error('Error updating template:', error);
+        throw error;
+    }
+};
+
+/**
+ * Increments the usage count for a template document. Used to track how often
+ * a template is selected to create content so we can sort by "most popular".
+ * @param {String} templateId
+ */
+export const incrementTemplateUsage = async (templateId) => {
+    try {
+        if (!templateId) return;
+        const templateRef = doc(db, 'templates', templateId);
+        await runTransaction(db, async (transaction) => {
+            const snapshot = await transaction.get(templateRef);
+            if (!snapshot.exists()) return;
+
+            const current = Number(snapshot.data()?.usageCount ?? 0) || 0;
+            transaction.update(templateRef, {
+                usageCount: current + 1,
+                updatedAt: new Date().toISOString(),
+            });
+        });
+    } catch (error) {
+        console.error('Error incrementing template usage:', error);
+        throw error;
+    }
+};
+
+/**
+ * Decrements the usage count for a template document when related content is deleted.
+ * The value is clamped at 0 to avoid negative counts.
+ * @param {String} templateId
+ */
+export const decrementTemplateUsage = async (templateId) => {
+    try {
+        if (!templateId) return;
+        const templateRef = doc(db, 'templates', templateId);
+        await runTransaction(db, async (transaction) => {
+            const snapshot = await transaction.get(templateRef);
+            if (!snapshot.exists()) return;
+
+            const current = Number(snapshot.data()?.usageCount ?? 0) || 0;
+            const next = Math.max(0, current - 1);
+            transaction.update(templateRef, {
+                usageCount: next,
+                updatedAt: new Date().toISOString(),
+            });
+        });
+    } catch (error) {
+        console.error('Error decrementing template usage:', error);
         throw error;
     }
 };

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, addDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
-import { fetchTemplates } from "../functions/templateDB";
+import { fetchTemplates, incrementTemplateUsage } from "../functions/templateDB";
 import "./styles/createContent.css";
 
 // Aminah:
@@ -123,6 +123,22 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         createdBy: user.uid,
         createdAt: new Date().toISOString(),
       });
+
+
+
+      // Aminah: If the created content used a saved template, increment its usage count
+      if (selectedTemplate) {
+        // check if selectedTemplate corresponds to a saved template id (fetched from Firestore)
+        const isSaved = savedTemplates.some((t) => t.id === selectedTemplate);
+        if (isSaved) {
+          try {
+            await incrementTemplateUsage(selectedTemplate);
+          } catch (incErr) {
+            console.warn('Failed to increment template usage:', incErr);
+          }
+        }
+      }
+
 
       setTitle("");
       setText("");
