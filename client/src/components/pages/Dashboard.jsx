@@ -248,7 +248,7 @@ const handleManualScheduleSubmit = async () => {
       setSchedulingPostId(item.id);
       setScheduleError(null);
 
-      const response = await fetch("http://localhost:5050/api/ai/suggest-post-time", {
+      const response = await fetch("http://localhost:5000/api/ai/suggest-post-time", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

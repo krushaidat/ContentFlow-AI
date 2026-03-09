@@ -414,9 +414,6 @@ function Signup({ onSignup }) {
             <div className="form-group">
               <label htmlFor="firstName">
                 First Name
-                <span style={{ fontSize: '11px', color: '#999', marginLeft: '6px', fontWeight: 'normal' }}>
-                  ({formData.firstName.length}/20)
-                </span>
               </label>
               <input
                 type="text"
@@ -434,9 +431,6 @@ function Signup({ onSignup }) {
             <div className="form-group">
               <label htmlFor="lastName">
                 Last Name
-                <span style={{ fontSize: '11px', color: '#999', marginLeft: '6px', fontWeight: 'normal' }}>
-                  ({formData.lastName.length}/20)
-                </span>
               </label>
               <input
                 type="text"
@@ -471,86 +465,6 @@ function Signup({ onSignup }) {
           <div className="form-group">
             <label htmlFor="password" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               Password
-              {/* Info icon */}
-              <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  ref={infoIconRef}
-                  onClick={() => setShowTooltip((prev) => !prev)}
-                  aria-label="Password requirements"
-                  style={{
-                    background: 'none',
-                    border: '1.5px solid #888',
-                    borderRadius: '50%',
-                    width: '17px',
-                    height: '17px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    padding: 0,
-                    color: '#666',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    lineHeight: 1,
-                  }}
-                >
-                  i
-                </button>
-
-                {/* Tooltip card */}
-                {showTooltip && (
-                  <div
-                    ref={tooltipRef}
-                    style={{
-                      position: 'absolute',
-                      bottom: '130%',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: '#fff',
-                      border: '1px solid #ddd',
-                      borderRadius: '10px',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.13)',
-                      padding: '14px 18px',
-                      minWidth: '230px',
-                      zIndex: 100,
-                      fontSize: '13px',
-                      color: '#222',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <div style={{ fontWeight: '600', marginBottom: '8px' }}>Passwords must contain:</div>
-                    <ul style={{ margin: 0, paddingLeft: '18px', listStyle: 'disc' }}>
-                      <RequirementItem met={passwordChecks.length} text="A minimum of 8 characters" />
-                      <RequirementItem met={passwordChecks.uppercase} text="At least 1 uppercase letter" />
-                      <RequirementItem met={passwordChecks.special} text="At least 1 special character" />
-                    </ul>
-                    {/* Tooltip arrow */}
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '-8px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '8px solid transparent',
-                      borderRight: '8px solid transparent',
-                      borderTop: '8px solid #ddd',
-                    }} />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '-7px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '7px solid transparent',
-                      borderRight: '7px solid transparent',
-                      borderTop: '7px solid #fff',
-                    }} />
-                  </div>
-                )}
-              </span>
             </label>
 
             {/* Password input with show/hide toggle */}
