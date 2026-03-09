@@ -588,6 +588,7 @@
 .edit-textarea,
 .edit-select {
   padding: 10px;
+  background-color: #fff;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 13px;
@@ -599,6 +600,7 @@
 .edit-textarea:focus,
 .edit-select:focus {
   outline: none;
+  background-color: #fff;
   border-color: #7c3aed;
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
 }

@@ -412,7 +412,7 @@ const handleManualScheduleSubmit = async () => {
               </div>
               <div className="content-item-title">{item.title}</div>
               <div className="content-item-text">{item.text}</div>
-              {item.rejectionReason && (
+              {item.rejectionReason && item.stage !== "Ready to Post" && (
                 <div className="rejection-reason">
                   <strong>Feedback:</strong> {item.rejectionReason}
                 </div>
