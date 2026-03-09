@@ -4,6 +4,8 @@ import "../styles/calendar.css";
 import { getCalendarData } from "../../utils/calendarService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
 // TA: Main Calendar component - manages calendar state and rendering with multiple view modes (month/week/day)
 const Calendar = () => {
@@ -20,6 +22,15 @@ const [currentDate, setCurrentDate] = useState(new Date());
   const monthDropdownRef = useRef(null);
   const viewDropdownRef = useRef(null);
 
+
+// Abdalaa: when I click a scheduled item in the calendar,
+// I want to store it here so I can edit or delete it.
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
+  const [editSchedule, setEditSchedule] = useState({
+  date: "",
+  time: "",
+});
   // TA: Event listeners and data fetching
   useEffect(() => {
     // Abdalaa: I want the calendar to wait for Firebase auth
@@ -34,7 +45,7 @@ const [currentDate, setCurrentDate] = useState(new Date());
       try {
         setLoading(true);
         const data = await getCalendarData();
-        console.log("Abdalaa calendar loaded events:", data);
+        console.log("calendar loaded events:", data);
         setEvents(data);
       } catch (error) {
         console.error("Error loading calendar data:", error);
@@ -49,7 +60,7 @@ const [currentDate, setCurrentDate] = useState(new Date());
       try {
         setLoading(true);
         const data = await getCalendarData();
-        console.log("Abdalaa calendar focus refresh:", data);
+        console.log(" calendar focus refresh:", data);
         setEvents(data);
       } catch (error) {
         console.error("Error refreshing calendar data:", error);
@@ -142,7 +153,80 @@ const [currentDate, setCurrentDate] = useState(new Date());
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // TA: Render calendar UI
+// Abdalaa: when I click a scheduled event, I want the modal
+// to open with that event's current date and time already filled in.
+const handleOpenEventModal = (event) => {
+  setSelectedEvent(event);
+  setEditSchedule({
+    date: event.suggestedDate || "",
+    time: event.suggestedTime || "",
+  });
+};
+
+// Abdalaa: closing the modal should also reset the local edit state
+// so the next event opens clean and does not keep old values.
+const handleCloseEventModal = () => {
+  setSelectedEvent(null);
+  setEditSchedule({
+    date: "",
+    time: "",
+  });
+};
+
+// Abdalaa: save the updated scheduled date/time back to Firestore,
+// then reload the calendar right away so the change shows instantly.
+const handleUpdateScheduledEvent = async () => {
+  try {
+    if (!selectedEvent) return;
+
+    if (selectedEvent.source !== "calendarSlot") {
+      alert("Only scheduled posts can be edited here.");
+      return;
+    }
+
+    if (!editSchedule.date || !editSchedule.time) {
+      alert("Please choose both date and time.");
+      return;
+    }
+
+    await updateDoc(doc(db, "calendarSlots", selectedEvent.id), {
+      date: editSchedule.date,
+      time: editSchedule.time,
+    });
+
+    const refreshed = await getCalendarData();
+    setEvents(refreshed);
+    handleCloseEventModal();
+  } catch (error) {
+    console.error("Error updating scheduled event:", error);
+    alert("Failed to update scheduled event.");
+  }
+};
+
+// Abdalaa: delete the scheduled calendar slot from Firestore,
+// then refresh the calendar so it disappears from the UI.
+const handleDeleteScheduledEvent = async () => {
+  try {
+    if (!selectedEvent) return;
+
+    if (selectedEvent.source !== "calendarSlot") {
+      alert("Only scheduled posts can be deleted here.");
+      return;
+    }
+
+    await deleteDoc(doc(db, "calendarSlots", selectedEvent.id));
+
+    const refreshed = await getCalendarData();
+    setEvents(refreshed);
+    handleCloseEventModal();
+  } catch (error) {
+    console.error("Error deleting scheduled event:", error);
+    alert("Failed to delete scheduled event.");
+  }
+};
+  
   return (
+    
     <div className="calendar-container">
       <div className="calendar-header">
         <h1>AI Suggested Content Calendar</h1>
@@ -244,8 +328,14 @@ const [currentDate, setCurrentDate] = useState(new Date());
                           <div className="day-number">{day}</div>
                           <div className="day-events">
                             {getEventsForDate(day).map((event, idx) => (
-                              <div key={`${day}-${idx}`} className={`event-badge ${getBadgeColor(event.status)}`} title={event.title}>{event.title}</div>
-                            ))}
+                              <div
+                               key={`${day}-${idx}`}
+                                className={`event-badge ${getBadgeColor(event.status)}`}
+                               title={event.title}
+                               onClick={() => handleOpenEventModal(event)}
+                                >
+                               {event.title}
+                              </div>                            ))}
                           </div>
                         </>
                       )}
@@ -273,9 +363,19 @@ const [currentDate, setCurrentDate] = useState(new Date());
                     <div className="week-time-cell">{`${hour.toString().padStart(2, "0")}:00`}</div>
                     {getWeekDays(currentDate).map((day, dayIdx) => (
                       <div key={`cell-${hour}-${dayIdx}`} className="week-time-slot">
-                        {getEventsForDateObj(day).filter((event) => event.suggestedTime?.startsWith(hour.toString().padStart(2, "0")) || hour === 8).map((event) => (
-                          <div key={event.id} className={`event-badge ${getBadgeColor(event.status)}`} title={event.title}>{event.title}</div>
-                        ))}
+                        {getEventsForDateObj(day)
+  .filter((event) =>
+    event.suggestedTime?.startsWith(hour.toString().padStart(2, "0"))
+  )
+  .map((event) => (
+                          <div
+                          key={event.id}
+                          className={`event-badge ${getBadgeColor(event.status)}`}
+                          title={event.title}
+                          onClick={() => handleOpenEventModal(event)}
+                        >
+                          {event.title}
+                        </div>                        ))}
                       </div>
                     ))}
                   </div>
@@ -293,9 +393,16 @@ const [currentDate, setCurrentDate] = useState(new Date());
                   <div key={`day-hour-${hour}`} className="day-hour-row">
                     <div className="day-time-label">{`${hour.toString().padStart(2, "0")}:00`}</div>
                     <div className="day-events-slot">
-                      {getEventsForDateObj(currentDate).filter((event) => event.suggestedTime?.startsWith(hour.toString().padStart(2, "0")) || hour === 8).map((event) => (
-                        <div key={event.id} className={`event-badge ${getBadgeColor(event.status)}`} title={event.title}>
-                          <div className="event-time">{event.suggestedTime || "All day"}</div>
+                    {getEventsForDateObj(currentDate)
+  .filter((event) =>
+    event.suggestedTime?.startsWith(hour.toString().padStart(2, "0"))
+  )
+  .map((event) => (                    <div
+                      key={event.id}
+                      className={`event-badge ${getBadgeColor(event.status)}`}
+                      title={event.title}
+                      onClick={() => handleOpenEventModal(event)}
+>                          <div className="event-time">{event.suggestedTime || "All day"}</div>
                           <div className="event-title">{event.title}</div>
                           {event.reason && <div className="event-reason">{event.reason}</div>}
                         </div>
@@ -325,8 +432,65 @@ const [currentDate, setCurrentDate] = useState(new Date());
           </div>
         </div>
       )}
+            {selectedEvent && (
+        <div className="modal-overlay" onClick={handleCloseEventModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{selectedEvent.title}</h3>
+              <button className="modal-close" onClick={handleCloseEventModal}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={editSchedule.date}
+                  onChange={(e) =>
+                    setEditSchedule({ ...editSchedule, date: e.target.value })
+                  }
+                  className="edit-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Time</label>
+                <input
+                  type="time"
+                  value={editSchedule.time}
+                  onChange={(e) =>
+                    setEditSchedule({ ...editSchedule, time: e.target.value })
+                  }
+                  className="edit-input"
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn-cancel" onClick={handleCloseEventModal}>
+                  Cancel
+                </button>
+
+                <button className="btn-save" onClick={handleUpdateScheduledEvent}>
+                  Save Changes
+                </button>
+
+                <button
+                  className="btn-save"
+                  onClick={handleDeleteScheduledEvent}
+                  style={{ backgroundColor: "#dc2626" }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+
+  
+ 
 };
 
 export default Calendar;

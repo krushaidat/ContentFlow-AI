@@ -298,16 +298,21 @@ Return ONLY valid JSON in this exact format:
 
     await db.collection("calendarSlots").add(slotData);
 
-    await db.collection("aiSuggestions").add({
-      userId,
-      postId,
-      title: postData.title || "Untitled",
-      reason: aiResult.reason || "",
-      suggestedDate: aiResult.suggestedDate,
-      suggestedTime: aiResult.suggestedTime,
-      status: "idea",
-      createdAt: new Date(),
-    });
+    // Abdalaa: if the post was actually scheduled, I do not want
+    // to also create a separate AI idea record for the same time,
+    // because that makes the calendar show something that cannot be edited.
+    if (!usedFallback) {
+      await db.collection("aiSuggestions").add({
+        userId,
+        postId,
+        title: postData.title || "Untitled",
+        reason: aiResult.reason || "",
+        suggestedDate: aiResult.suggestedDate,
+        suggestedTime: aiResult.suggestedTime,
+        status: "idea",
+        createdAt: new Date(),
+      });
+    };
 
     return res.json({
       success: true,
@@ -320,6 +325,55 @@ Return ONLY valid JSON in this exact format:
     console.error("Error suggesting post time:", error);
     return res.status(500).json({
       error: "Failed to suggest posting time.",
+      details: error.message,
+    });
+  }
+  
+};
+/**
+ * Abdalaa:
+ * This lets the user manually choose a date and time
+ * and saves that post directly into calendarSlots.
+ */
+exports.manualSchedulePost = async (req, res) => {
+  try {
+    const { postId, userId, date, time } = req.body;
+
+    if (!postId || !userId || !date || !time) {
+      return res.status(400).json({
+        error: "postId, userId, date, and time are required",
+      });
+    }
+
+    const postRef = db.collection("content").doc(postId);
+    const postDoc = await postRef.get();
+
+    if (!postDoc.exists) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    const postData = postDoc.data();
+
+    await db.collection("calendarSlots").add({
+      userId,
+      postId,
+      title: postData.title || "Untitled",
+      date,
+      time,
+      reason: "Scheduled manually by user.",
+      slotStatus: "scheduled",
+      createdAt: new Date(),
+    });
+
+    return res.json({
+      success: true,
+      date,
+      time,
+    });
+  } catch (error) {
+    console.error("Manual schedule error:", error);
+    return res.status(500).json({
+      error: "Failed to schedule post manually.",
       details: error.message,
     });
   }

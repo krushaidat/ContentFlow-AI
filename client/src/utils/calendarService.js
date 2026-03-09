@@ -22,7 +22,43 @@ export const getCalendarData = async () => {
 
     const events = [];
 
-    // Fetch aI Suggestions
+    // Abdalaa: I load real scheduled items first because those are
+    // the ones the user should be able to edit and delete.
+    const slotsRef = collection(db, "calendarSlots");
+    const slotsQuery = query(slotsRef, where("userId", "==", user.uid));
+    const slotsSnapshot = await getDocs(slotsQuery);
+
+    const scheduledPostIds = new Set();
+
+    slotsSnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+
+      if (data.slotStatus === "scheduled" || data.slotStatus === "completed") {
+        const normalizedDate =
+          typeof data.date === "string"
+            ? data.date
+            : data.date?.toDate?.().toISOString().split("T")[0] || "";
+
+        events.push({
+          id: docSnap.id,
+          title: data.title || data.postTitle || "Untitled",
+          reason: data.reason || data.description || "",
+          suggestedDate: normalizedDate,
+          suggestedTime: data.time || "",
+          status: data.slotStatus || "scheduled",
+          postId: data.postId || "",
+          createdAt: data.createdAt || new Date(),
+          source: "calendarSlot",
+        });
+
+        if (data.postId) {
+          scheduledPostIds.add(data.postId);
+        }
+      }
+    });
+
+    // Abdalaa: I only keep AI suggestions for posts that are not already
+    // scheduled, otherwise the same post shows twice and opens the wrong modal.
     const suggestionsRef = collection(db, "aiSuggestions");
     const suggestionsQuery = query(
       suggestionsRef,
@@ -30,56 +66,32 @@ export const getCalendarData = async () => {
     );
     const suggestionsSnapshot = await getDocs(suggestionsQuery);
 
-    suggestionsSnapshot.forEach((doc) => {
-      const data = doc.data();
+    suggestionsSnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+
+      if (data.postId && scheduledPostIds.has(data.postId)) {
+        return;
+      }
+
       events.push({
-        id: doc.id,
-        title: data.title || data.postTitle || "Untitled",
-        reason: data.reason || data.description || "",
-
-   // Abdalaa: normalize the Firestore date so the calendar
-// can correctly match the event to the right day
-suggestedDate:
-typeof data.date === "string"
-  ? data.date
-  : data.date?.toDate?.().toISOString().split("T")[0] || "",
-
-// Abdalaa: store time exactly how the calendar expects it
-suggestedTime: data.time || "",
-        status: data.slotStatus === "completed" ? "completed" : "scheduled",
+        id: docSnap.id,
+        title: data.title || "Untitled",
+        reason: data.reason || "",
+        suggestedDate:
+          typeof data.suggestedDate === "string"
+            ? data.suggestedDate
+            : data.suggestedDate?.toDate?.().toISOString().split("T")[0] || "",
+        suggestedTime: data.suggestedTime || "",
+        status: "idea",
         postId: data.postId || "",
         createdAt: data.createdAt || new Date(),
-        source: "calendarSlot",
+        source: "aiSuggestion",
       });
     });
-    console.log("Abdalaa calendar events loaded:", events);
-    // Fetch Calendar Slots (these are either scheduled or completed posts)
-    const slotsRef = collection(db, "calendarSlots");
-    const slotsQuery = query(slotsRef, where("userId", "==", user.uid));
-    const slotsSnapshot = await getDocs(slotsQuery);
 
-    slotsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      // Only add calendar slots that are scheduled or completed
-      if (data.slotStatus === "scheduled" || data.slotStatus === "completed") {
-        events.push({
-          id: doc.id,
-          title: data.title || data.postTitle || "Untitled",
-          reason: data.description || "",
-          suggestedDate: data.date || new Date(),
-          suggestedTime: data.time || "",
-// Abdalaa: normalize status so calendar badges render correctly
-          status: data.slotStatus || "scheduled",
-          postId: data.postId || "",
-          createdAt: data.createdAt || new Date(),
-          source: "calendarSlot",
-        });
-      }
-    });
-
-    // Sort events by date
     events.sort((a, b) => new Date(a.suggestedDate) - new Date(b.suggestedDate));
 
+    console.log(" final calendar events:", events);
     return events;
   } catch (error) {
     console.error("Error fetching calendar data:", error);
