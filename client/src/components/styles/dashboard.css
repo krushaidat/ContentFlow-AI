@@ -778,7 +778,14 @@
   background-color: #dcfce7;
   color: #166534;
 }
+.secondary-schedule-btn {
+  background: #ede9fe;
+  color: #7c3aed;
+}
 
+.secondary-schedule-btn:hover {
+  background: #ddd6fe;
+}
 .review-status.rejected {
   background-color: #fee2e2;
   color: #991b1b;

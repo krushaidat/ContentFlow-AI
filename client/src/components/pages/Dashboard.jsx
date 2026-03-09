@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy } from "firebase/firestore";
-import { db } from "../../firebase";
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy, addDoc } from "firebase/firestore";import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
 import CreateTemplate from "../../functions/CreateTemplate";
@@ -9,6 +8,64 @@ import "../styles/dashboard.css";
 import ManageTemplates from "../ManageTemplates";
 
 export default function Dashboard() {
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+const [selectedPostForSchedule, setSelectedPostForSchedule] = useState(null);
+const [manualSchedule, setManualSchedule] = useState({
+  date: "",
+  time: "",
+});
+const handleOpenScheduleModal = (item) => {
+  // Abdalaa: opening the manual scheduling modal for one specific post
+  setSelectedPostForSchedule(item);
+  setManualSchedule({ date: "", time: "" });
+  setScheduleModalOpen(true);
+};
+
+const handleCloseScheduleModal = () => {
+  // Abdalaa: reset modal state when the user closes it
+  setScheduleModalOpen(false);
+  setSelectedPostForSchedule(null);
+  setManualSchedule({ date: "", time: "" });
+};
+
+const handleManualScheduleSubmit = async () => {
+  try {
+    if (!selectedPostForSchedule) return;
+
+    if (!manualSchedule.date || !manualSchedule.time) {
+      setScheduleError("Please choose both a date and a time.");
+      return;
+    }
+
+    setScheduleError(null);
+
+    const response = await fetch("http://localhost:5050/api/ai/manual-schedule", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        postId: selectedPostForSchedule.id,
+        userId: user.uid,
+        date: manualSchedule.date,
+        time: manualSchedule.time,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to schedule post.");
+    }
+
+    handleCloseScheduleModal();
+    await fetchContent(user);
+    alert(`Post scheduled for ${data.date} at ${data.time}`);
+  } catch (error) {
+    console.error("Error scheduling post manually:", error);
+    setScheduleError(error.message || "Could not schedule post.");
+  }
+};
   const [content, setContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,7 +76,12 @@ export default function Dashboard() {
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  // Abdalaa: This keeps track of which content card is currently asking AI
+  // for a suggested posting time, so the button can show loading state.
+  const [schedulingPostId, setSchedulingPostId] = useState(null);
 
+  // Abdalaa: This stores any scheduling error message from the AI suggestion flow.
+  const [scheduleError, setScheduleError] = useState(null);
   const auth = getAuth();
   /** DRAVEN
    * Sets up an authentication state listener using Firebase's onAuthStateChanged function.
@@ -164,6 +226,53 @@ export default function Dashboard() {
     }
   };
 
+    // Abdalaa: This sends the selected content item to the backend,
+  // asks Gemini for the best posting time based on the calendar,
+  // and saves the result into Firestore as a scheduled slot.
+
+  const handleSuggestPostingTime = async (item) => {
+    try {
+      setSchedulingPostId(item.id);
+      setScheduleError(null);
+
+      const response = await fetch("http://localhost:5050/api/ai/suggest-post-time", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          postId: item.id,
+          userId: user.uid,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to suggest posting time.");
+      }
+
+      // Abdalaa: Refreshing content after scheduling so the UI stays current.
+      await fetchContent(user);
+
+      const sourceLabel =
+      data.source === "gemini"
+        ? "Gemini picked this time"
+        : "Fallback time was used because Gemini was unavailable";
+
+    alert(
+      `${sourceLabel}\nScheduled for ${data.suggestedDate} at ${data.suggestedTime}`
+    );
+
+      
+    } catch (error) {
+      console.error("Error suggesting posting time:", error);
+      setScheduleError(error.message || "Could not suggest posting time.");
+    } finally {
+      setSchedulingPostId(null);
+    }
+  };
+
   /**
    - Updates the document in the database with new title, text, and status
    - Closes the modal after successful save
@@ -264,6 +373,7 @@ export default function Dashboard() {
       <h2 className="dashboard-section-title">My Content</h2>
 
       {error && <div className="error-alert">{error}</div>}
+      {scheduleError && <div className="error-alert">{scheduleError}</div>}
 
       {loading ? (
         <div className="loading">Loading your content...</div>
@@ -301,6 +411,32 @@ export default function Dashboard() {
                 <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
               <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
+              
+                {/* Abdalaa: I only want the scheduling buttons to show
+                    once the post is actually in the Ready to Post stage. */}
+                {item.stage === "Ready to Post" && (
+                  <>
+                    <button
+                      className="dashboard-card-btn schedule-btn"
+                      onClick={() => handleSuggestPostingTime(item)}
+                      disabled={schedulingPostId === item.id}
+                      style={{ marginTop: "8px", marginBottom: "8px" }}
+                    >
+                      {schedulingPostId === item.id
+                        ? "Suggesting Time..."
+                        : "Suggest Posting Time Using AI"}
+                    </button>
+
+                    <button
+                      className="dashboard-card-btn secondary-schedule-btn"
+                      onClick={() => handleOpenScheduleModal(item)}
+                      style={{ marginTop: "0px", marginBottom: "8px" }}
+                    >
+                      Schedule This Post
+                    </button>
+                  </>
+                )}
+
             </div>
           ))}
         </div>
@@ -369,7 +505,61 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+{scheduleModalOpen && selectedPostForSchedule && (
+  <div className="modal-overlay" onClick={handleCloseScheduleModal}>
+    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h3>Schedule This Post</h3>
+        <button className="modal-close" onClick={handleCloseScheduleModal}>×</button>
+      </div>
 
+      <div className="modal-body">
+        <div className="form-group">
+          <label htmlFor="manual-schedule-date">Date</label>
+          <input
+            id="manual-schedule-date"
+            type="date"
+            value={manualSchedule.date}
+            onChange={(e) =>
+              setManualSchedule({ ...manualSchedule, date: e.target.value })
+            }
+            className="edit-input"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="manual-schedule-time">Time</label>
+          <input
+            id="manual-schedule-time"
+            type="time"
+            value={manualSchedule.time}
+            onChange={(e) =>
+              setManualSchedule({ ...manualSchedule, time: e.target.value })
+            }
+            className="edit-input"
+          />
+        </div>
+
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="btn-cancel"
+            onClick={handleCloseScheduleModal}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-save"
+            onClick={handleManualScheduleSubmit}
+          >
+            Save Schedule
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       {pendingDeleteId && (
         <div className="modal-overlay" onClick={() => setPendingDeleteId(null)}>
           <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
