@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { fetchTemplates, deleteTemplate } from "../../functions/templateDB";
 import CreateTemplate from "../../functions/CreateTemplate";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../../firebase";
+import TemplateIcon from "../TemplateIcon";
 import "../styles/templatesPage.css";
 
 export default function TemplatesPage() {
@@ -14,7 +15,7 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [sortBy, setSortBy] = useState("recent");
 
-  const buildUsageMapFromContent = async () => {
+  const buildUsageMapFromContent = useCallback(async () => {
     const auth = getAuth();
     const currentUser = auth.currentUser || await new Promise((resolve) => {
       const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -36,9 +37,9 @@ export default function TemplatesPage() {
     });
 
     return usageMap;
-  };
+  }, []);
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       const [templateData, usageMap] = await Promise.all([
         fetchTemplates(),
@@ -56,13 +57,17 @@ export default function TemplatesPage() {
     } catch (error) {
       console.error("Failed to load templates:", error);
     }
-  };
+  }, [buildUsageMapFromContent]);
 
   // Aminah: Load templates when the component mounts
 
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    const timer = setTimeout(() => {
+      loadTemplates();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [loadTemplates]);
 
   const handleEditClick = (e, item) => {
     e.stopPropagation();
@@ -205,7 +210,12 @@ return (
               <div className="card-body">
                 <div className="template-title-row">
                   <div className="template-card-icon">
-                    <span role="img" aria-label="Template icon">{item.icon || "📄"}</span>
+                    <TemplateIcon
+                      icon={item.icon}
+                      iconType={item.iconType}
+                      label="Template icon"
+                      size={36}
+                    />
                   </div>
                   <div className="template-title">{item.title}</div>
                 </div>

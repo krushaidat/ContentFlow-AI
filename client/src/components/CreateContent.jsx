@@ -3,6 +3,7 @@ import { collection, addDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 import { fetchTemplates, incrementTemplateUsage } from "../functions/templateDB";
+import TemplateIcon from "./TemplateIcon";
 import "./styles/createContent.css";
 
 // Aminah:
@@ -13,6 +14,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     {
       id: "company-announcement",
       name: "Company Announcement",
+      icon: "📢",
+      iconType: "emoji",
       title: "Company Announcement: ",
       text: "Share company news and updates:\n\n• Key announcement:\n• Why it matters:\n• Call to action:",
       description: "Structure for announcing company news",
@@ -21,6 +24,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     {
       id: "new-product-launch",
       name: "New Product",
+      icon: "🛒",
+      iconType: "emoji",
       title: "The Product: ",
       text: "Introduce your new product:\n\n• Key features:\n• Who will benefit:\n• Launch date & availability:",
       description: "Structure for detailing new product launches",
@@ -29,6 +34,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     {
       id: "Product Update",
       name: "Event Promotion",
+      icon: "🎫",
+      iconType: "emoji",
       title: "Join Us: ",
       text: " Event details\n\n• Date:\n• Time:\n• What you’ll learn:\n• Register link:",
       description: "Structure for promoting upcoming webinars, workshops, or events",
@@ -37,6 +44,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     {
       id: "Newsletter",
       name: "Weekly Newsletter",
+      icon: "📰",
+      iconType: "emoji",
       title: "Weekly Newsletter: ",
       text: "Outline for curating weekly newsletter content:\n\n• Top story:\n• Highlights:\n• Links & CTAs:",
       description: "Outline for curating weekly newsletter content",
@@ -86,6 +95,8 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         const mappedTemplates = templates.map((template) => ({
           id: template.id,
           name: template.title || "Untitled Template",
+          icon: template.icon || "📄",
+          iconType: template.iconType || "emoji",
           title: template.title ? `${template.title}: ` : "",
           text: template.content || "",
           description: template.content || "Saved custom template",
@@ -305,8 +316,12 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
                   filteredTemplates.map((t) => (
                     <div key={t.id} className="template-card">
                       <div className="template-card-icon">
-                         {/* AMINAH: Icon based on template type */}
-                        {t.id === "company-announcement" ? "📢" : t.id === "new-product-launch" ? "🛒" : t.id === "Product Update" ? "🎫" : "📄"}
+                        <TemplateIcon
+                          icon={t.icon}
+                          iconType={t.iconType}
+                          label="Template icon"
+                          size={30}
+                        />
                       </div>
                       <div className="template-card-body">
                         <div className="template-card-title">{t.name}</div>

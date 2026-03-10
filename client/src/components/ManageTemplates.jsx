@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
-import { db } from "../firebase";
 import "./styles/ManageTemplates.css";
 import { fetchTemplates, deleteTemplate } from "../functions/templateDB";
 import CreateTemplate from "../functions/CreateTemplate";
+import TemplateIcon from "./TemplateIcon";
 
 // Aminah: I merged the TemplateModal code into this ManageTemplates component to avoid confusion. This component is now self-contained and can be used directly in the Dashboard. The TemplateModal component was removed since its functionality is now part of ManageTemplates.
 // - I also updated the file name to ManageTemplates.jsx to reflect the component name and avoid confusion with Template.jsx, which is used for displaying individual templates in the content creation flow.
@@ -13,7 +12,6 @@ export default function ManageTemplates({ isOpen, onClose }) {
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
     const loadTemplates = async () => {
       try {
@@ -25,9 +23,14 @@ export default function ManageTemplates({ isOpen, onClose }) {
     };
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return undefined;
+
+    // Defer loading so this doesn't run as a synchronous state update in the effect body.
+    const timer = setTimeout(() => {
       loadTemplates();
-    }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [isOpen]);
     
   if (!isOpen) return null;
@@ -67,7 +70,7 @@ export default function ManageTemplates({ isOpen, onClose }) {
                 className="btn-submit"
                 onClick={() => {
                   setEditingTemplate(null);
-                  setShowCreateModal(true);
+                  setIsCreateOpen(true);
                 }}
               >
                 + Create Template
@@ -96,7 +99,14 @@ export default function ManageTemplates({ isOpen, onClose }) {
               ) : (
                 filteredTemplates.map((template) => (
                   <div key={template.id} className="manage-template-card">
-                    <div className="manage-template-card-icon" />
+                    <div className="manage-template-card-icon">
+                      <TemplateIcon
+                        icon={template.icon}
+                        iconType={template.iconType}
+                        label="Template icon"
+                        size={28}
+                      />
+                    </div>
 
                 <div className="manage-template-card-body">
                   <div className="manage-template-card-title">
