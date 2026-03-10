@@ -197,3 +197,184 @@ Return ONLY valid JSON in this exact format:
     });
   }
 };
+
+/**
+ * Abdalaa:
+ * This function asks Gemini to suggest the best available posting date and time
+ * for a content item, then saves it into calendarSlots as a scheduled post.
+ * i also added a flag so I can tell whether the result came from Gemini
+ * or from the fallback when Ai is unavailable.
+ */
+exports.suggestPostTime = async (req, res) => {
+  try {
+    const { postId, userId } = req.body;
+
+    if (!postId || !userId) {
+      return res.status(400).json({ error: "postId and userId are required" });
+    }
+
+    const postRef = db.collection("content").doc(postId);
+    const postDoc = await postRef.get();
+
+    if (!postDoc.exists) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    const postData = postDoc.data();
+
+    const slotsSnapshot = await db
+      .collection("calendarSlots")
+      .where("userId", "==", userId)
+      .get();
+
+    const existingSlots = slotsSnapshot.docs.map((doc) => doc.data());
+
+    const occupiedSlotsText = existingSlots.length
+      ? existingSlots
+          .map(
+            (slot) =>
+              `Date: ${slot.date || "unknown"}, Time: ${slot.time || "unknown"}, Status: ${slot.slotStatus || "unknown"}`
+          )
+          .join("\n")
+      : "No occupied calendar slots found.";
+
+    const prompt = `
+You are a content scheduling assistant.
+
+A user wants to schedule this post:
+Title: ${postData.title || "Untitled"}
+Content: ${postData.text || ""}
+
+These calendar slots are already occupied:
+${occupiedSlotsText}
+
+Suggest the best available posting date and time in the near future.
+
+Return ONLY valid JSON in this exact format:
+{
+  "suggestedDate": "YYYY-MM-DD",
+  "suggestedTime": "HH:MM",
+  "reason": "short explanation"
+}
+`;
+
+    let aiResult;
+    let usedFallback = false;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+
+      const clean = responseText
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+
+      aiResult = JSON.parse(clean);
+    } catch (apiError) {
+      console.error("Gemini scheduling error:", apiError.message);
+
+      // Abdalaa: if Gemini fails, I still want the feature to keep working
+      // during development, so I save a fallback result and mark it clearly.
+      usedFallback = true;
+
+      aiResult = {
+        suggestedDate: new Date().toISOString().split("T")[0],
+        suggestedTime: "10:00",
+        reason: "Fallback scheduled time used because AI was unavailable.",
+      };
+    }
+
+    const slotData = {
+      userId,
+      postId,
+      title: postData.title || "Untitled",
+      date: aiResult.suggestedDate,
+      time: aiResult.suggestedTime,
+      reason: aiResult.reason || "",
+      slotStatus: "scheduled",
+      createdAt: new Date(),
+    };
+
+    await db.collection("calendarSlots").add(slotData);
+
+    // Abdalaa: if the post was actually scheduled, I do not want
+    // to also create a separate AI idea record for the same time,
+    // because that makes the calendar show something that cannot be edited.
+    if (!usedFallback) {
+      await db.collection("aiSuggestions").add({
+        userId,
+        postId,
+        title: postData.title || "Untitled",
+        reason: aiResult.reason || "",
+        suggestedDate: aiResult.suggestedDate,
+        suggestedTime: aiResult.suggestedTime,
+        status: "idea",
+        createdAt: new Date(),
+      });
+    };
+
+    return res.json({
+      success: true,
+      suggestedDate: aiResult.suggestedDate,
+      suggestedTime: aiResult.suggestedTime,
+      reason: aiResult.reason || "",
+      source: usedFallback ? "fallback" : "gemini",
+    });
+  } catch (error) {
+    console.error("Error suggesting post time:", error);
+    return res.status(500).json({
+      error: "Failed to suggest posting time.",
+      details: error.message,
+    });
+  }
+  
+};
+/**
+ * Abdalaa:
+ * This lets the user manually choose a date and time
+ * and saves that post directly into calendarSlots.
+ */
+exports.manualSchedulePost = async (req, res) => {
+  try {
+    const { postId, userId, date, time } = req.body;
+
+    if (!postId || !userId || !date || !time) {
+      return res.status(400).json({
+        error: "postId, userId, date, and time are required",
+      });
+    }
+
+    const postRef = db.collection("content").doc(postId);
+    const postDoc = await postRef.get();
+
+    if (!postDoc.exists) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    const postData = postDoc.data();
+
+    await db.collection("calendarSlots").add({
+      userId,
+      postId,
+      title: postData.title || "Untitled",
+      date,
+      time,
+      reason: "Scheduled manually by user.",
+      slotStatus: "scheduled",
+      createdAt: new Date(),
+    });
+
+    return res.json({
+      success: true,
+      date,
+      time,
+    });
+  } catch (error) {
+    console.error("Manual schedule error:", error);
+    return res.status(500).json({
+      error: "Failed to schedule post manually.",
+      details: error.message,
+    });
+  }
+};

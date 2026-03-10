@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import useInPageAlert from "../hooks/useInPageAlert";
+import InPageAlert from "./InPageAlert";
 import "./styles/template.css";
 
 // Custom hook for templates state
@@ -39,6 +41,7 @@ const useTemplates = () => {
 const TemplateModal = ({ isOpen, onClose }) => {
   const { templates, setTemplates } = useTemplates();
   const [search, setSearch] = useState("");
+  const { alertState, showAlert, dismissAlert } = useInPageAlert();
 
   if (!isOpen) return null;
 
@@ -49,12 +52,13 @@ const TemplateModal = ({ isOpen, onClose }) => {
   );
 
   // Edit and delete handlers (stub)
-  const handleEdit = (id) => alert(`Edit template ${id}`);
+  const handleEdit = (id) => showAlert(`Edit template ${id}`, "info");
   const handleDelete = (id) => setTemplates(templates.filter(t => t.id !== id));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
+        <InPageAlert alertState={alertState} onClose={dismissAlert} />
         <div className="modal-header">
           <h2>Templates</h2>
           <button className="modal-close" onClick={onClose}>×</button>

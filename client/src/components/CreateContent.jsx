@@ -124,7 +124,9 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         createdAt: new Date().toISOString(),
       });
 
-      // If the created content used a saved template, increment its usage count
+
+
+      // Aminah: If the created content used a saved template, increment its usage count
       if (selectedTemplate) {
         // check if selectedTemplate corresponds to a saved template id (fetched from Firestore)
         const isSaved = savedTemplates.some((t) => t.id === selectedTemplate);
@@ -136,6 +138,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
           }
         }
       }
+
 
       setTitle("");
       setText("");

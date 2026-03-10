@@ -8,6 +8,10 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth } from "../../firebase";
+import { db } from "../../firebase";
+import useInPageAlert from "../../hooks/useInPageAlert";
+import { setDoc, doc, getDoc } from "firebase/firestore";
+import InPageAlert from "../InPageAlert";
 import "../styles/login.css";
 import {AiOutlineEye, AiOutlineEyeInvisible} from 'react-icons/ai'
 
@@ -68,6 +72,7 @@ export default function Login({ onLogin }) {
   const [forgotMessage, setForgotMessage] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const { alertState, showAlert, dismissAlert } = useInPageAlert();
 
   const tooltipRef = useRef(null);
   const infoIconRef = useRef(null);
@@ -103,6 +108,30 @@ export default function Login({ onLogin }) {
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
       const user = userCredential.user;
+      
+      // Create or update user profile document in Firestore
+      const userDocRef = doc(db, "Users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      const nameParts = (user.displayName || '').split(' ');
+      const firstName = nameParts[0] || 'User';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      const userData = {
+        email: user.email.toLowerCase(),
+        firstName: firstName,
+        lastName: lastName,
+        displayName: user.displayName || user.email,
+      };
+      
+      // Only add role if user document doesn't exist (new user)
+      if (!userDocSnap.exists()) {
+        userData.role = "user";
+        userData.createdAt = new Date();
+      }
+      
+      await setDoc(userDocRef, userData, { merge: true }); // merge: true preserves existing fields like role
+      
       const idToken = await user.getIdToken();
       onLogin({ uid: user.uid, email: user.email, token: idToken });
     } catch (err) {
@@ -122,7 +151,7 @@ export default function Login({ onLogin }) {
     if (!unverifiedUser) return;
     try {
       await sendEmailVerification(unverifiedUser);
-      alert("Verification email sent!");
+      showAlert("Verification email sent!", "success");
       setShowResendVerification(false);
     } catch (err) {
       console.error("Error resending verification email:", err);
@@ -157,6 +186,30 @@ export default function Login({ onLogin }) {
         setLoading(false);
         return;
       }
+
+      // Ensure user profile exists in Firestore
+      const userDocRef = doc(db, "Users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      const nameParts = (user.displayName || '').split(' ');
+      const firstName = nameParts[0] || 'User';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      // Only set role to "user" if this is a new user (no existing document)
+      const userData = {
+        email: user.email.toLowerCase(),
+        firstName: firstName,
+        lastName: lastName,
+        displayName: user.displayName || user.email,
+      };
+      
+      // Only add role if user document doesn't exist (new user)
+      if (!userDocSnap.exists()) {
+        userData.role = "user";
+        userData.createdAt = new Date();
+      }
+      
+      await setDoc(userDocRef, userData, { merge: true }); // merge: true preserves existing fields like role
 
       const idToken = await user.getIdToken();
       onLogin({
