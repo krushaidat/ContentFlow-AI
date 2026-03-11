@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 
 const CreateTemplate = ({
@@ -21,7 +20,6 @@ const CreateTemplate = ({
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
-  /** DRAVEN: Fetch existing template data if editing. If creating, fields are reset to empty. */
   useEffect(() => {
     if (!isOpen) return;
 
@@ -54,6 +52,10 @@ const CreateTemplate = ({
 
     setLoading(true);
     try {
+      const nowIso = new Date().toISOString();
+      const existingCreatedAt =
+        templateToEdit?.createdAt || templateToEdit?.created_at || nowIso;
+
       const payload = {
         title: trimmedTitle,
         requiredSections: trimmedSections,
@@ -61,12 +63,21 @@ const CreateTemplate = ({
         content: trimmedStructure,
         icon: "📄",
         lastModified: new Date().toLocaleDateString(),
+        lastModifiedAt: nowIso,
+        updatedAt: nowIso,
       };
 
       if (isEditMode && templateToEdit?.id) {
-        await updateDoc(doc(db, "templates", templateToEdit.id), payload);
+        await updateDoc(doc(db, "templates", templateToEdit.id), {
+          ...payload,
+          createdAt: existingCreatedAt,
+        });
       } else {
-        await addDoc(collection(db, "templates"), payload);
+        await addDoc(collection(db, "templates"), {
+          ...payload,
+          createdAt: nowIso,
+          usageCount: 0,
+        });
       }
 
       setSuccess(true);
