@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy, addDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
@@ -10,7 +10,16 @@ import useInPageAlert from "../../hooks/useInPageAlert";
 import InPageAlert from "../InPageAlert";
 
 export default function Dashboard() {
-  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const ALL_STAGES = "All Stages";
+  const STAGES = [
+  ALL_STAGES,
+  "Draft",
+  "Review",
+  "Update",
+  "Ready to Post",
+  "Posted",
+];
+const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 const [selectedPostForSchedule, setSelectedPostForSchedule] = useState(null);
 const [manualSchedule, setManualSchedule] = useState({
   date: "",
@@ -73,10 +82,11 @@ const handleManualScheduleSubmit = async () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [selectedStage, setSelectedStage] = useState(ALL_STAGES);//Filter stages
+  const [search, setSearch] = useState("");
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
-  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
   // Abdalaa: This keeps track of which content card is currently asking AI
@@ -109,7 +119,12 @@ const handleManualScheduleSubmit = async () => {
 
     return () => unsubscribe();
   }, [navigate]);
-
+  
+  useEffect(() => {
+    if (selectedStage) {
+      fetchContent();
+    }
+  }, [selectedStage]);
   /** DRAVEN
    * Fetches content from Firestore for the authenticated user.
    * @param {*} user - The authenticated user object.
@@ -133,13 +148,17 @@ const handleManualScheduleSubmit = async () => {
       setLoading(false);
       return;
     }
+    setLoading(true);
     try {
-      setLoading(true);
       // Security fix: Filter by createdBy to only fetch user's own content
       // This matches Firestore security rules that allow reading only own documents
+      const filters = [where("createdBy", "==", currentUser.uid)];
+      if (selectedStage && selectedStage !== ALL_STAGES) {
+        filters.push(where("stage", "==", selectedStage));
+      }
       const q = query(
         collection(db, "content"),
-        where("createdBy", "==", currentUser.uid)
+        ...filters
       );
       const querySnapshot = await getDocs(q);
       // Performance fix: Sort on client-side instead of orderBy in query
@@ -169,7 +188,7 @@ const handleManualScheduleSubmit = async () => {
       planning: "badge-planning",
       review: "badge-review",
       update: "badge-update",
-      "ready-to-post": "badge-ready",
+      "ready to post": "badge-ready",
     };
     return statusMap[stage?.toLowerCase()] || "badge-draft";
   };
@@ -336,6 +355,13 @@ const handleManualScheduleSubmit = async () => {
       </div>
     );
   }
+  const filteredContent = content.filter((item) => {
+    const title = (item.title || "").toLowerCase();
+    const text = (item.text || "").toLowerCase();
+    const query = search.toLowerCase();
+    return title.includes(query) || text.includes(query);
+  });
+  
 
   return (
     <div className="dashboard-main">
@@ -369,6 +395,20 @@ const handleManualScheduleSubmit = async () => {
           </div>
         </div>
       </div>
+      <div className="dashboard-toolbar">
+        <div className="dashboard-search-wrap">
+          <input type="text" className="dashboard-search-input" placeholder="Search content..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        <div className="dashboard-filter-wrap">
+          <span className="dashboard-filter-label">Stage</span>
+          <select className="dashboard-stage-select" value={selectedStage} onChange={(e) => setSelectedStage(e.target.value)}>
+            {STAGES.map((stage) => (
+              <option key={stage} value={stage}>{stage}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    
 
       {/* AMINAH: CreateContent modal */}
       <CreateContent
@@ -388,13 +428,13 @@ const handleManualScheduleSubmit = async () => {
 
       {loading ? (
         <div className="loading">Loading your content...</div>
-      ) : content.length === 0 ? (
+      ) : filteredContent.length === 0 ? (
         <div className="empty-state">
           <p>No content yet. Create your first piece of content!</p>
         </div>
       ) : (
         <div className="dashboard-content-list">
-          {content.map((item) => (
+          {filteredContent.map((item) => (
             <div key={item.id} className="dashboard-content-card content-item-box">
               {/* AMINAH: Content item box container */}
               <div className="dashboard-content-header">
