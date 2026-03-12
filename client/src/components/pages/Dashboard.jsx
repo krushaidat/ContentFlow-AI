@@ -89,6 +89,7 @@ const handleManualScheduleSubmit = async () => {
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
+  const [templateTitles, setTemplateTitles] = useState([]);
   // Abdalaa: This keeps track of which content card is currently asking AI
   // for a suggested posting time, so the button can show loading state.
   const [schedulingPostId, setSchedulingPostId] = useState(null);
@@ -110,6 +111,7 @@ const handleManualScheduleSubmit = async () => {
         // Only fetch content if user is authenticated
         // Prevents "User not authenticated" errors
         fetchContent();
+        fetchTemplateTitles();
       } else {
         setLoading(false);
         setError("Please sign in to view your content");
@@ -177,6 +179,19 @@ const handleManualScheduleSubmit = async () => {
     }
   };
 
+  const fetchTemplateTitles = async () => {
+    try{  
+      const snapshot = await getDocs(collection(db, "templates"));
+      const titleMap={};
+      snapshot.forEach((templateDoc) => {
+        const data = templateDoc.data() || {};
+        titleMap[templateDoc.id] = data.title || "";
+      });
+      setTemplateTitles(titleMap);
+    } catch (err) {
+      console.error("Error fetching template titles:", err);
+    }
+  };
   /**
    * Returns the appropriate CSS class name for a status badge
    * based on the content's current stage (draft, planning, review, etc.)
@@ -362,7 +377,7 @@ const handleManualScheduleSubmit = async () => {
     return title.includes(query) || text.includes(query);
   });
   
-
+ 
   return (
     <div className="dashboard-main">
       <InPageAlert alertState={alertState} onClose={dismissAlert} />
@@ -461,7 +476,7 @@ const handleManualScheduleSubmit = async () => {
                 <span className="content-item-stage">Stage: {item.stage}</span>
                 <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
-              <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
+              <div className="dashboard-content-type">{item.type || templateTitles[item.templateId] || item.category || item.name || "Company Announcement"}</div>
               
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}
