@@ -128,3 +128,12 @@
   padding: 10px 12px;
   margin-bottom: 14px;
 }
+
+.team-th-sort {
+  cursor: pointer;
+  user-select: none;
+}
+
+.team-th-sort:hover {
+  color: #6d35de;
+}

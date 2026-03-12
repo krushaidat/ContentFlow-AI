@@ -27,6 +27,7 @@ export default function Team() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
 
   const isAdmin = useMemo(() => me?.role === "admin", [me]);
 /**DRAVEN
@@ -168,6 +169,35 @@ export default function Team() {
     }
   };
 
+  const handleSort = (key) => {
+    setSortConfig((prev) => 
+     prev.key === key
+      ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      : { key, dir: "asc" }
+    );
+  };
+
+  const sortedMembers = useMemo(() => {
+    if (!sortConfig.key) return members;
+    return [...members].sort((a, b) => {
+      let aVal = "";
+      let bVal = "";
+      if (sortConfig.key === "name") {
+        aVal = (a.firstName || "") + " " + (a.lastName || "") || a.displayName || "";
+        bVal = (b.firstName || "") + " " + (b.lastName || "") || b.displayName || "";
+      } else if (sortConfig.key === "email") {
+        aVal = a.email || "";
+        bVal = b.email || "";
+      } else if (sortConfig.key === "role") {
+        aVal = a.role || "";
+        bVal = b.role || "";
+      }
+      return sortConfig.dir === "asc"
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal);
+    });
+  }, [members, sortConfig]);
+
   if (loading) return <div className="team-page"><div className="team-card">Loading team...</div></div>;
 
   return (
@@ -227,13 +257,19 @@ export default function Team() {
               <table className="team-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
+                    <th className="team-th-sort" onClick={() => handleSort("name")}>
+                      Name {sortConfig.key === "name" ? (sortConfig.dir === "asc" ? "▲" : "▼") : "⇕"}
+                    </th>
+                    <th className="team-th-sort" onClick={() => handleSort("email")}>
+                      Email {sortConfig.key === "email" ? (sortConfig.dir === "asc" ? "▲" : "▼") : "⇕"}
+                    </th>
+                    <th className="team-th-sort" onClick={() => handleSort("role")}>
+                      Role {sortConfig.key === "role" ? (sortConfig.dir === "asc" ? "▲" : "▼") : "⇕"}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m) => (
+                  {sortedMembers.map((m) => (
                     <tr key={m.uid}>
                       <td>{(m.firstName || "") + " " + (m.lastName || "") || m.displayName || "Unknown"}</td>
                       <td>{m.email || "-"}</td>
