@@ -167,8 +167,32 @@ export default function Team() {
     } finally {
       setSaving(false);
     }
-  };
-
+  }; 
+  const handleRemoveMember = async (memberUid) => {
+    if (!isAdmin || !team?.id || !user?.uid) return;
+    setSaving(true);
+    setError("");
+    try{
+      const response = await fetch("http://localhost:5000/api/team/remove-member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminId: user.uid,
+          memberId: memberUid,
+          teamId: team.id,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to remove member.");
+      }
+      await loadTeamData();
+    }catch (e) {
+      setError(e.message || "Failed to remove member.");
+    }finally{
+      setSaving(false);
+    }
+  }
   const handleSort = (key) => {
     setSortConfig((prev) => 
      prev.key === key
@@ -177,6 +201,7 @@ export default function Team() {
     );
   };
 
+  /**DRAVEN This memoized value sorts the team members based on the current sort configuration (by name, email, or role). */
   const sortedMembers = useMemo(() => {
     if (!sortConfig.key) return members;
     return [...members].sort((a, b) => {
@@ -291,6 +316,20 @@ export default function Team() {
                           <span className="team-role">{m.role || "user"}</span>
                         )}
                       </td>
+                      {isAdmin && (
+                        <td>
+                          {m.uid !== user?.uid && (
+                            <button
+                              className="team-btn-remove"
+                              disable={saving}
+                              onClick={() => handleRemoveMember(m.uid)}
+                              title="Remove member"
+                            >
+                              Remove
+                            </button>
+                          )}
+                          </td>
+                      )}
                     </tr>
                   ))}
                   {!members.length && (
