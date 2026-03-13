@@ -3,20 +3,22 @@
   justify-content: center;
   align-items: flex-start;
   min-height: 100vh;
-  background: #f5f7fa;
+  background: #f5f3ff;
   padding: 40px 20px;
 }
 
 .profile-card {
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 14px 34px rgba(124, 58, 237, 0.08);
+  border: 1px solid #ece7f8;
   padding: 40px;
   width: 100%;
-  max-width: 900px;
+  max-width: 980px;
   display: flex;
   flex-direction: column;
 }
+
 /*header section with avatar and user info */
 .profile-header {
   display: flex;
@@ -76,15 +78,17 @@
 }
 
 .profile-info h2 {
-  font-size: 1.8rem;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: #1f2937;
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+  color: #111827;
+  letter-spacing: -0.03em;
 }
 
 .profile-info p {
   color: #6b7280;
-  font-size: 1rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
 }
 
 .edit-btn {
@@ -222,10 +226,11 @@
 }
 
 .profile-view .form-group p {
-  padding: 12px 14px;
-  background: #f9fafb;
-  border-radius: 6px;
-  color: #1f2937;
+  padding: 14px 16px;
+  background: #faf7ff;
+  border: 1px solid #ece7f8;
+  border-radius: 14px;
+  color: #111827;
   font-size: 1rem;
 }
 
