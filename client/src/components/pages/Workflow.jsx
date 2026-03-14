@@ -666,7 +666,7 @@ const Workflow = () => {
         </div>
 
         <p className="workflow-note modern-note">
-          AI validation powered by Gemini API • Results saved to Firebase
+          AI validation powered by Gemini API
         </p>
       </div>
     </div>

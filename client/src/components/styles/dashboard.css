@@ -103,9 +103,10 @@
   color: #92400e;
 }
 
-.dashboard-badge.badge-ready {
-  background-color: #dcfce7;
-  color: #166534;
+.dashboard-badge.badge-ready,
+.dashboard-badge.badge-ready-to-post {
+  background-color: #0bc64d;
+  color: #0e371e;
 }
 
 .dashboard-content-menu {

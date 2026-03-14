@@ -14,7 +14,7 @@ import { db } from "../../firebase";
 import { useAuth } from "../../hooks/useAuth";
 import "../styles/team.css";
 
-const ROLE_OPTIONS = ["user", "author", "reviewer", "admin"];
+const ROLE_OPTIONS = ["user", "reviewer", "admin"];
 //**DRAVEN This page allows admins to manage their team, including creating a team, inviting members, and assigning roles. 
 // While users can only view the team and its members.*/
 export default function Team() {

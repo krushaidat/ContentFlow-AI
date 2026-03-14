@@ -169,7 +169,7 @@ const handleManualScheduleSubmit = async () => {
       planning: "badge-planning",
       review: "badge-review",
       update: "badge-update",
-      "ready-to-post": "badge-ready",
+      "ready to post": "badge-ready",
     };
     return statusMap[stage?.toLowerCase()] || "badge-draft";
   };
