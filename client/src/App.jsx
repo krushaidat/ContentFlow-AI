@@ -96,7 +96,17 @@ function App() {
                 </Layout>
               }
             />
-            <Route path="/profile" element={<Profile />} />
+            <Route
+              path="/profile"
+              element={
+                <Layout
+                  onLogout={handleLogoutCleanup}
+                  displayName={displayName}
+                >
+                  <Profile />
+                </Layout>
+              }
+            />
             <Route
               path="/workflow"
               element={

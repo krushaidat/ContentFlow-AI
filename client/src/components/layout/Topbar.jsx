@@ -72,10 +72,6 @@ const Topbar = ({
             >
               Profile
             </button>
-
-            <button className="menu-item" role="menuitem">
-              Settings
-            </button>
             <div className="menu-divider" />
             <button
               className="menu-item danger"

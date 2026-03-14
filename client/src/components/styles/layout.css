@@ -226,11 +226,19 @@
 .topbar-left h2 {
   font-size: 18px;
   font-weight: 600;
+  margin: 0;
 }
 
 .topbar-left p {
   font-size: 13px;
   color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.topbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .user-avatar {
