@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "test": "jest --verbose --forceExit --detectOpenHandles",
     "dev": "nodemon index.js"
   },
   "keywords": [],
@@ -19,6 +20,7 @@
     "firebase-admin": "^13.6.1"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.1.11"
   }
 }
