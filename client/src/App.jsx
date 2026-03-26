@@ -10,7 +10,7 @@ import { auth } from "./firebase";
 import Profile from "./components/pages/Profile";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./components/pages/Dashboard";
-import Workflow from "./components/pages/Workflow";
+import Workflow from "./components/pages/workflowPage/Workflow";
 import Templates from "./components/pages/Templates";
 import Calendar from "./components/pages/Calendar";
 import Login from "./components/pages/Login";

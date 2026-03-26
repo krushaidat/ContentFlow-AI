@@ -1,380 +1,361 @@
-console.log("API KEY:", process.env.GEMINI_API_KEY);
+/**
+ * AI Controller — ContentFlow AI (Final)
+ * Authors: Tanvir (original), refactored
+ */
+
 const db = require("../config/firebase");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI, SchemaType } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-/**
- * validatePost - Tanvir
- - Validates content using Google Gemini AI and stores validation results in Firestore.
- - Fetches a content document by postId, extracts the text, and sends it to Gemini for analysis.
- - Returns compliance score, brand score, missing sections, and suggestions.
- * 
- - If API quota is exceeded, falls back to mock validation data for development/testing.
- - Updates the 'validation' field in the Firestore document with results and timestamp.
- */
-exports.validatePost = async (req, res) => {
-  console.log("\nVALIDATION REQUEST STARTED ");
-  console.log("Timestamp:", new Date().toISOString());
-  console.log("Request body:", JSON.stringify(req.body));
-  
-  try {
-    const { postId } = req.body;
+// Model configs — each endpoint gets a model with the right JSON schema
 
-    if (!postId) {
-      console.log("ERROR: postId is required");
-      return res.status(400).json({ error: "postId is required" });
-    }
+const validationSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    compliance: { type: SchemaType.BOOLEAN, description: "true if brandScore >= 70 and no missing sections" },
+    brandScore: { type: SchemaType.INTEGER, description: "0-100 brand consistency score" },
+    missingSections: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: "Required sections not covered in the content",
+    },
+    suggestions: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: "Specific actionable improvement suggestions",
+    },
+  },
+  required: ["compliance", "brandScore", "missingSections", "suggestions"],
+};
 
-    console.log("postId received:", postId);
-    console.log("Attempting to fetch content with postId:", postId);
-    
-    const postRef = db.collection("content").doc(postId);
-    console.log("Document reference created");
-    
-    const postDoc = await postRef.get();
-    console.log("Document fetch completed, exists:", postDoc.exists);
+const fixesSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    fixedTitle: { type: SchemaType.STRING, description: "Improved title" },
+    fixedText: { type: SchemaType.STRING, description: "Full rewritten content" },
+    changesSummary: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: "Brief description of each change",
+    },
+  },
+  required: ["fixedTitle", "fixedText", "changesSummary"],
+};
 
-    if (!postDoc.exists) {
-      console.error(`Content document not found: ${postId}`);
-      return res.status(404).json({ error: "Content not found" });
-    }
-
-    const postData = postDoc.data();
-    console.log("Retrieved post data keys:", Object.keys(postData));
-    console.log("Post data:", JSON.stringify(postData).substring(0, 200));
-
-    // Validate that text field exists
-    if (!postData || !postData.text) {
-      console.error("Post data missing text field:", postData);
-      return res.status(400).json({ error: "Content text is missing or empty" });
-    }
-
-    console.log("Text field found, length:", postData.text.length);
-
-    const templateRef = db.collection("templates").doc(postData.templateId);
-    const templateDoc = await templateRef.get();
-    console.log("Template fetch completed, exists:", templateDoc.exists);
-
-    let templateData = null;
-    if (!templateDoc.exists) {
-      console.warn(`Template not found: ${postData.templateId}. Validating without template context.`);
-      templateData = { name: postData.templateId, guidelines: "Generic content validation" };
-    } else {
-      templateData = templateDoc.data();
-      console.log("Template data retrieved");
-    }
-
-    const prompt = `
-You are a content validation engine.
-
-Analyze this content:
-"${postData.text}"
-
-Template: ${templateData?.name || "Generic"}
-
-Return ONLY valid JSON in this exact format:
-
-{
-  "compliance": true or false,
-  "brandScore": number between 0 and 100,
-  "missingSections": ["section names if any"],
-  "suggestions": ["improvement suggestions"]
-}
-`;
-
-    let aiResult;
-
-    try {
-      console.log("Prompt created, length:", prompt.length);
-      console.log("Sending prompt to Gemini API (model: gemini-2.0-flash)...");
-      console.log("API Key loaded:", !!process.env.GEMINI_API_KEY);
-      console.log("genAI instance:", !!genAI);
-      console.log("model instance:", !!model);
-      
-      const result = await model.generateContent(prompt);
-      console.log("Received response from Gemini API");
-      
-      if (!result || !result.response) {
-        console.error("Invalid response structure from API:", result);
-        return res.status(500).json({
-            error: "Invalid response from Gemini API",
-            details: "Response structure is invalid"
-        });
-      }
-
-      console.log("Response has valid structure");
-      const responseText = result.response.text();
-      console.log("Response text extracted, length:", responseText.length);
-      console.log("Response preview:", responseText.substring(0, 300));
-
-      try {
-        const clean = responseText
-          .replace(/```json/g, "")
-          .replace(/```/g, "")
-          .trim();
-
-        console.log("String cleaned, length:", clean.length);
-        aiResult = JSON.parse(clean);
-        console.log("Successfully parsed AI response");
-        console.log("Result:", JSON.stringify(aiResult));
-      } catch (err) {
-        console.error("Failed to parse JSON response");
-        console.error("Parse error:", err.message);
-        console.error("RAW AI RESPONSE:", responseText);
-        return res.status(500).json({
-            error: "AI returned invalid JSON",
-            raw: responseText
-        });
-      }
-    } catch (apiError) {
-      // Log full error details to help diagnose API issues
-      console.error("GEMINI API ERROR:");
-      console.error("Error message:", apiError.message);
-      console.error("Error status:", apiError.status);
-      console.error("Error code:", apiError.code);
-      console.error("Full error:", JSON.stringify(apiError, null, 2));
-      
-      // Check if it's a quota failure (status 429) or similar
-      if (apiError.status === 429 || apiError.message?.includes("quota") || apiError.message?.includes("Quota")) {
-        console.warn("⚠ QUOTA EXCEEDED - Using mock validation as fallback");
-        aiResult = {
-          compliance: true,
-          brandScore: 82,
-          missingSections: [],
-          suggestions: ["Consider adding a call-to-action", "Verify brand tone matches guidelines"]
-        };
-      } else {
-        // For other errors, return the actual error so you can see what's wrong
-        return res.status(500).json({
-          error: "Gemini API failed",
-          details: apiError.message,
-          status: apiError.status
-        });
-      }
-    }
-
-    console.log("Attempting to update Firestore with validation results");
-    await postRef.update({
-      validation: {
-        compliance: aiResult.compliance ?? false,
-        brandScore: aiResult.brandScore ?? 0,
-        suggestions: aiResult.suggestions ?? [],
-        missingSections: aiResult.missingSections ?? [],
-        validatedAt: new Date()
+const writingAssistSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    suggestions: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          text: { type: SchemaType.STRING, description: "1-2 sentence continuation" },
+          label: { type: SchemaType.STRING, description: "2-3 word label" },
+        },
+        required: ["text", "label"],
       },
-      updatedAt: new Date()
-    });
-    console.log("Successfully updated Firestore document");
-    console.log("VALIDATION COMPLETED SUCCESSFULLY \n");
+    },
+  },
+  required: ["suggestions"],
+};
 
-    return res.json({
-      success: true,
-      validation: aiResult
-    });
+const schedulingSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    suggestedDate: { type: SchemaType.STRING, description: "YYYY-MM-DD" },
+    suggestedTime: { type: SchemaType.STRING, description: "HH:MM" },
+    reason: { type: SchemaType.STRING, description: "Short explanation" },
+  },
+  required: ["suggestedDate", "suggestedTime", "reason"],
+};
 
-  } catch (error) {
-    console.error("AI validation FAILED");
-    console.error("Error message:", error.message);
-    console.error("Full error object:", JSON.stringify(error, null, 2));
-    console.error("Stack trace:", error.stack);
-    console.log("VALIDATION FAILED \n");
+function createModel(schema, maxTokens = 1024) {
+  return genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: maxTokens,
+      responseMimeType: "application/json",
+      responseSchema: schema,
+    },
+  });
+}
 
-    if (req.body?.postId) {
-      try {
-        await db.collection("content").doc(req.body.postId).update({
-          "validation.validatedAt": new Date()
-        });
-      } catch (updateErr) {
-        console.error("Failed to update validation timestamp:", updateErr.message);
+// Request queue — 4s between calls
+let queue = Promise.resolve();
+
+function enqueue(fn) {
+  queue = queue
+    .then(() => new Promise((r) => setTimeout(r, 4000)))
+    .then(fn)
+    .catch((err) => { throw err; });
+  return queue;
+}
+
+// Retry with exponential backoff
+async function callWithRetry(model, prompt, retries = 3) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      return JSON.parse(text);
+    } catch (err) {
+      const retryable =
+        err?.status === 429 ||
+        err?.status === 503 ||
+        err?.message?.includes("RESOURCE_EXHAUSTED") ||
+        err?.message?.includes("overloaded");
+
+      if (retryable && i < retries) {
+        const wait = Math.pow(2, i + 1) * 1000 + Math.random() * 1000;
+        console.warn(`Gemini retry ${i + 1}/${retries}, waiting ${Math.round(wait)}ms`);
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
       }
+      throw err;
     }
+  }
+}
 
-    return res.status(500).json({
-      error: "Validation failed. No data overwritten.",
-      details: error.message
-    });
+// Queued + retried call
+function callGemini(model, prompt) {
+  return enqueue(() => callWithRetry(model, prompt));
+}
+
+// Build template context — handles all Firestore field variations
+function buildTemplateContext(t) {
+  if (!t) return "No template. Use general marketing best practices.";
+
+  const lines = [];
+  lines.push(`Name: ${t.name || t.title || "Unnamed"}`);
+
+  // requiredSections: could be array or colon/comma-separated string
+  let sections = t.requiredSections;
+  if (typeof sections === "string") {
+    sections = sections.split(/[:,\n]+/).map((s) => s.trim()).filter(Boolean);
+  }
+  if (Array.isArray(sections) && sections.length) {
+    lines.push(`Required Sections: ${sections.join(", ")}`);
+  }
+
+  const tone = t.toneRules || t.tone;
+  if (tone) lines.push(`Tone: ${tone}`);
+
+  const structure = t.structuralRules || t.structure;
+  if (structure) lines.push(`Structure: ${structure}`);
+
+  if (t.languageConstraints) lines.push(`Language: ${t.languageConstraints}`);
+
+  return lines.join("\n");
+}
+
+// Fetch template helper
+async function fetchTemplate(templateId) {
+  if (!templateId) return null;
+  const doc = await db.collection("templates").doc(templateId).get();
+  return doc.exists ? doc.data() : null;
+}
+
+// POST /api/ai/validate
+exports.validatePost = async (req, res) => {
+  try {
+    const { postId, templateId } = req.body;
+    if (!postId) return res.status(400).json({ error: "postId is required." });
+
+    const postRef = db.collection("content").doc(postId);
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) return res.status(404).json({ error: "Content not found." });
+
+    const post = postDoc.data();
+    if (!post?.text) return res.status(400).json({ error: "Content text is empty." });
+
+    const tplId = templateId || post.templateId;
+    const tpl = await fetchTemplate(tplId);
+    const ctx = buildTemplateContext(tpl);
+
+    const model = createModel(validationSchema, 4096);
+
+    const prompt = `Validate this marketing content against the template guidelines.
+
+GUIDELINES:
+${ctx}
+
+CONTENT:
+Title: "${post.title || "Untitled"}"
+"${post.text}"
+
+Rules: compliance=true only if brandScore>=70 and missingSections is empty. Placeholders don't count as covered.`;
+
+    const result = await callGemini(model, prompt);
+
+    const validation = {
+      compliance: Boolean(result.compliance),
+      brandScore: Number(result.brandScore) || 0,
+      suggestions: result.suggestions || [],
+      missingSections: result.missingSections || [],
+      templateUsed: tplId || "none",
+      validatedAt: new Date().toISOString(),
+    };
+
+    await postRef.update({ validation, updatedAt: new Date().toISOString() });
+    return res.json({ success: true, validation });
+  } catch (err) {
+    console.error("Validation failed:", err.message);
+    return res.status(500).json({ error: "Validation failed. Try again shortly.", details: err.message });
   }
 };
 
-/**
- * Abdalaa:
- * This function asks Gemini to suggest the best available posting date and time
- * for a content item, then saves it into calendarSlots as a scheduled post.
- * i also added a flag so I can tell whether the result came from Gemini
- * or from the fallback when Ai is unavailable.
- */
+// POST /api/ai/apply-fixes
+exports.applyFixes = async (req, res) => {
+  try {
+    const { postId, templateId } = req.body;
+    if (!postId) return res.status(400).json({ error: "postId is required." });
+
+    const postRef = db.collection("content").doc(postId);
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) return res.status(404).json({ error: "Content not found." });
+
+    const post = postDoc.data();
+    if (!post?.text) return res.status(400).json({ error: "Content text is empty." });
+
+    const tplId = templateId || post.templateId;
+    const tpl = await fetchTemplate(tplId);
+    const ctx = buildTemplateContext(tpl);
+    const issues = post.validation?.suggestions || [];
+
+    const model = createModel(fixesSchema, 8192);
+
+    const prompt = `Rewrite this content to fully satisfy the template guidelines. Preserve the author's intent.
+
+GUIDELINES:
+${ctx}
+
+ORIGINAL:
+Title: "${post.title || "Untitled"}"
+"${post.text}"
+
+ISSUES TO FIX:
+${issues.length ? issues.join("; ") : "Improve based on guidelines."}`;
+
+    const result = await callGemini(model, prompt);
+
+    await postRef.update({
+      title: result.fixedTitle || post.title,
+      text: result.fixedText || post.text,
+      lastFixedAt: new Date().toISOString(),
+      fixChangesSummary: result.changesSummary || [],
+      updatedAt: new Date().toISOString(),
+    });
+
+    return res.json({
+      success: true,
+      fixedTitle: result.fixedTitle || post.title,
+      fixedText: result.fixedText || post.text,
+      changesSummary: result.changesSummary || [],
+    });
+  } catch (err) {
+    console.error("Apply fixes failed:", err.message);
+    return res.status(500).json({ error: "Could not apply fixes. Try again shortly.", details: err.message });
+  }
+};
+
+// POST /api/ai/writing-assist
+exports.writingAssist = async (req, res) => {
+  try {
+    const { currentText, templateId } = req.body;
+    if (!currentText || currentText.trim().length < 10) {
+      return res.status(400).json({ error: "Provide at least 10 characters." });
+    }
+
+    const tpl = await fetchTemplate(templateId);
+    const ctx = buildTemplateContext(tpl);
+
+    const model = createModel(writingAssistSchema, 2048);
+
+    const prompt = `Suggest 3 short continuations (1-2 sentences each) for this marketing draft. Match the template tone.
+
+TEMPLATE: ${ctx}
+
+DRAFT SO FAR:
+"${currentText}"`;
+
+    const result = await callGemini(model, prompt);
+    return res.json({ success: true, suggestions: result.suggestions || [] });
+  } catch (err) {
+    console.error("Writing assist failed:", err.message);
+    return res.status(500).json({ error: "Writing assist unavailable.", details: err.message });
+  }
+};
+
+// POST /api/ai/suggest-post-time (Abdalaa)
 exports.suggestPostTime = async (req, res) => {
   try {
     const { postId, userId } = req.body;
+    if (!postId || !userId) return res.status(400).json({ error: "postId and userId required." });
 
-    if (!postId || !userId) {
-      return res.status(400).json({ error: "postId and userId are required" });
-    }
+    const postDoc = await db.collection("content").doc(postId).get();
+    if (!postDoc.exists) return res.status(404).json({ error: "Content not found." });
+    const post = postDoc.data();
 
-    const postRef = db.collection("content").doc(postId);
-    const postDoc = await postRef.get();
+    const slots = await db.collection("calendarSlots").where("userId", "==", userId).get();
+    const occupied = slots.docs.map((d) => d.data());
+    const slotsText = occupied.length
+      ? occupied.map((s) => `${s.date} ${s.time} (${s.slotStatus})`).join(", ")
+      : "None";
 
-    if (!postDoc.exists) {
-      return res.status(404).json({ error: "Content not found" });
-    }
+    const model = createModel(schedulingSchema, 256);
+    const prompt = `Suggest the best posting date/time. Title: "${post.title}". Occupied: ${slotsText}`;
 
-    const postData = postDoc.data();
-
-    const slotsSnapshot = await db
-      .collection("calendarSlots")
-      .where("userId", "==", userId)
-      .get();
-
-    const existingSlots = slotsSnapshot.docs.map((doc) => doc.data());
-
-    const occupiedSlotsText = existingSlots.length
-      ? existingSlots
-          .map(
-            (slot) =>
-              `Date: ${slot.date || "unknown"}, Time: ${slot.time || "unknown"}, Status: ${slot.slotStatus || "unknown"}`
-          )
-          .join("\n")
-      : "No occupied calendar slots found.";
-
-    const prompt = `
-You are a content scheduling assistant.
-
-A user wants to schedule this post:
-Title: ${postData.title || "Untitled"}
-Content: ${postData.text || ""}
-
-These calendar slots are already occupied:
-${occupiedSlotsText}
-
-Suggest the best available posting date and time in the near future.
-
-Return ONLY valid JSON in this exact format:
-{
-  "suggestedDate": "YYYY-MM-DD",
-  "suggestedTime": "HH:MM",
-  "reason": "short explanation"
-}
-`;
-
-    let aiResult;
-    let usedFallback = false;
-
+    let result, usedFallback = false;
     try {
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-
-      const clean = responseText
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-      aiResult = JSON.parse(clean);
-    } catch (apiError) {
-      console.error("Gemini scheduling error:", apiError.message);
-
-      // Abdalaa: if Gemini fails, I still want the feature to keep working
-      // during development, so I save a fallback result and mark it clearly.
+      result = await callGemini(model, prompt);
+    } catch {
       usedFallback = true;
-
-      aiResult = {
-        suggestedDate: new Date().toISOString().split("T")[0],
-        suggestedTime: "10:00",
-        reason: "Fallback scheduled time used because AI was unavailable.",
-      };
+      result = { suggestedDate: new Date().toISOString().split("T")[0], suggestedTime: "10:00", reason: "Fallback — AI unavailable." };
     }
 
-    const slotData = {
-      userId,
-      postId,
-      title: postData.title || "Untitled",
-      date: aiResult.suggestedDate,
-      time: aiResult.suggestedTime,
-      reason: aiResult.reason || "",
-      slotStatus: "scheduled",
-      createdAt: new Date(),
-    };
+    await db.collection("calendarSlots").add({
+      userId, postId, title: post.title || "Untitled",
+      date: result.suggestedDate, time: result.suggestedTime,
+      reason: result.reason, slotStatus: "scheduled", createdAt: new Date(),
+    });
 
-    await db.collection("calendarSlots").add(slotData);
-
-    // Abdalaa: if the post was actually scheduled, I do not want
-    // to also create a separate AI idea record for the same time,
-    // because that makes the calendar show something that cannot be edited.
     if (!usedFallback) {
       await db.collection("aiSuggestions").add({
-        userId,
-        postId,
-        title: postData.title || "Untitled",
-        reason: aiResult.reason || "",
-        suggestedDate: aiResult.suggestedDate,
-        suggestedTime: aiResult.suggestedTime,
-        status: "idea",
-        createdAt: new Date(),
+        userId, postId, title: post.title || "Untitled",
+        reason: result.reason, suggestedDate: result.suggestedDate,
+        suggestedTime: result.suggestedTime, status: "idea", createdAt: new Date(),
       });
-    };
+    }
 
-    return res.json({
-      success: true,
-      suggestedDate: aiResult.suggestedDate,
-      suggestedTime: aiResult.suggestedTime,
-      reason: aiResult.reason || "",
-      source: usedFallback ? "fallback" : "gemini",
-    });
-  } catch (error) {
-    console.error("Error suggesting post time:", error);
-    return res.status(500).json({
-      error: "Failed to suggest posting time.",
-      details: error.message,
-    });
+    return res.json({ success: true, ...result, source: usedFallback ? "fallback" : "gemini" });
+  } catch (err) {
+    console.error("Suggest post time error:", err);
+    return res.status(500).json({ error: "Failed to suggest time.", details: err.message });
   }
-  
 };
-/**
- * Abdalaa:
- * This lets the user manually choose a date and time
- * and saves that post directly into calendarSlots.
- */
+
+// POST /api/ai/manual-schedule (Abdalaa — unchanged)
 exports.manualSchedulePost = async (req, res) => {
   try {
     const { postId, userId, date, time } = req.body;
-
     if (!postId || !userId || !date || !time) {
-      return res.status(400).json({
-        error: "postId, userId, date, and time are required",
-      });
+      return res.status(400).json({ error: "postId, userId, date, and time required." });
     }
 
-    const postRef = db.collection("content").doc(postId);
-    const postDoc = await postRef.get();
-
-    if (!postDoc.exists) {
-      return res.status(404).json({ error: "Content not found" });
-    }
-
-    const postData = postDoc.data();
+    const postDoc = await db.collection("content").doc(postId).get();
+    if (!postDoc.exists) return res.status(404).json({ error: "Content not found." });
 
     await db.collection("calendarSlots").add({
-      userId,
-      postId,
-      title: postData.title || "Untitled",
-      date,
-      time,
-      reason: "Scheduled manually by user.",
-      slotStatus: "scheduled",
-      createdAt: new Date(),
+      userId, postId, title: postDoc.data().title || "Untitled",
+      date, time, reason: "Scheduled manually.", slotStatus: "scheduled", createdAt: new Date(),
     });
 
-    return res.json({
-      success: true,
-      date,
-      time,
-    });
-  } catch (error) {
-    console.error("Manual schedule error:", error);
-    return res.status(500).json({
-      error: "Failed to schedule post manually.",
-      details: error.message,
-    });
+    return res.json({ success: true, date, time });
+  } catch (err) {
+    console.error("Manual schedule error:", err);
+    return res.status(500).json({ error: "Failed to schedule.", details: err.message });
   }
 };
