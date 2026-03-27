@@ -17,6 +17,14 @@ const ReviewerCard = ({
   onSelectReviewer,
   onAssignReviewer,
 }) => {
+  // Aminah Update: fixed reviewer assignment logic to prioritize selected reviewer, then suggested, then current
+  const effectiveReviewerId =
+    selectedReviewer ||
+    selectedContent?.suggestedReviewerId ||
+    selectedContent?.reviewerId;
+  const currentAssignmentId =
+    selectedContent?.reviewerId || selectedContent?.suggestedReviewerId;
+
   // Only show for Review stage and admin users
   if (selectedStage !== "Review" || userRole !== "admin" || !selectedContent) {
     return null;
@@ -32,11 +40,13 @@ const ReviewerCard = ({
         <div className="reviewer-assignment">
           <div className="reviewer-section">
             <div className="reviewer-subtitle">Current Assignment</div>
-            {selectedContent.reviewerId ? (
+            {currentAssignmentId ? (
               <div className="reviewer-assigned">
-                <span className="reviewer-badge">✓ Assigned</span>
+                <span className="reviewer-badge">
+                  {selectedContent.reviewerId ? "✓ Assigned" : "◇ Auto Suggested"}
+                </span>
                 <div className="reviewer-id-text">
-                  {currentReviewerName} ({selectedContent.reviewerId})
+                  {currentReviewerName} ({currentAssignmentId})
                 </div>
               </div>
             ) : (
@@ -59,7 +69,7 @@ const ReviewerCard = ({
                     <option value="">Choose a reviewer...</option>
                     {availableReviewers.map((reviewer) => (
                       <option key={reviewer.uid} value={reviewer.uid}>
-                        {reviewer.name || reviewer.email} ({reviewer.currentLoad || 0}/5)
+                        {reviewer.name || reviewer.email}
                       </option>
                     ))}
                   </select>
@@ -69,7 +79,7 @@ const ReviewerCard = ({
                 <button
                   className="assign-reviewer-btn"
                   onClick={onAssignReviewer}
-                  disabled={!selectedReviewer || assigningReviewer}
+                  disabled={!effectiveReviewerId || assigningReviewer}
                 >
                   {assigningReviewer ? "Assigning..." : "Assign Reviewer"}
                 </button>

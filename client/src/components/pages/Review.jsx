@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import useInPageAlert from '../../hooks/useInPageAlert';
-import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import InPageAlert from '../InPageAlert';
 import '../styles/dashboard.css';
@@ -21,49 +21,49 @@ const ReviewPage = () => {
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
 
   /**DRAVEN
-   * Loads all content items assigned to the logged-in reviewer.
-   * - Reads Firestore "content" collection
-   * - Filters by reviewerId == current user uid
-   * - Sorts newest first for better reviewer workflow
-   * - Updates loading/error state for UI feedback
-   */
-  const fetchAssignedContent = useCallback(async () => {
-    if (!user?.uid) return;
-
-    try {
-      setLoading(true);
-      const q = query(
-        collection(db, 'content'),
-        where('reviewerId', '==', user.uid)
-      );
-
-      const querySnapshot = await getDocs(q);
-      const items = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
-      setAssignedItems(items);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching assigned content:", err);
-      setError("Failed to load assigned reviews.");
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.uid]);
-
-  /**DRAVEN
-   * Triggers initial load and reloads when reviewer identity/role changes.
+   * Streams assigned content in real time for the logged-in reviewer.
    * Access is restricted to users with reviewer role.
    */
+  // Aminah update: switched reviewer assignments from one-time fetch to Firestore onSnapshot so new assignments appear instantly without page refresh.
   useEffect(() => {
-    if (user?.role === 'reviewer' && user?.uid) {
-      fetchAssignedContent();
-    } else {
+    if (user?.role !== 'reviewer' || !user?.uid) {
+      setAssignedItems([]);
       setLoading(false);
+      return;
     }
-  }, [user?.role, user?.uid, fetchAssignedContent]);
+
+    setLoading(true);
+    setError(null);
+
+    const q = query(
+      collection(db, 'content'),
+      where('reviewerId', '==', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const items = querySnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .sort((a, b) => {
+            const aTime = typeof a.createdAt === 'string' ? Date.parse(a.createdAt) : Number(a.createdAt || 0);
+            const bTime = typeof b.createdAt === 'string' ? Date.parse(b.createdAt) : Number(b.createdAt || 0);
+            return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+          });
+
+        setAssignedItems(items);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error streaming assigned content:', err);
+        setError('Failed to load assigned reviews.');
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user?.role, user?.uid]);
 
   /**DRAVEN
    * Opens the detail modal for a selected content item.

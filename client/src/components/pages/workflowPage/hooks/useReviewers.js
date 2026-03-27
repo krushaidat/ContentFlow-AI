@@ -46,8 +46,14 @@ export const useReviewers = () => {
     selectedReviewer,
     showAlert
   ) => {
+    // Aminah Update: fixed reviewer assignment logic to prioritize selected reviewer, then suggested, then current
+    const effectiveReviewerId =
+      selectedReviewer ||
+      selectedContent?.suggestedReviewerId ||
+      selectedContent?.reviewerId;
+
     if (
-      !selectedReviewer ||
+      !effectiveReviewerId ||
       !selectedContent ||
       !user?.uid ||
       user?.role !== "admin"
@@ -66,7 +72,7 @@ export const useReviewers = () => {
         body: JSON.stringify({
           adminId: user.uid,
           contentId: selectedContent.id,
-          reviewerId: selectedReviewer,
+          reviewerId: effectiveReviewerId,
           teamId: user.teamId,
         }),
       });

@@ -123,8 +123,11 @@ const Workflow = () => {
   }, [selectedStage, user?.role, user?.uid]);
 
   useEffect(() => {
-    fetchReviewerName(selectedContent?.reviewerId);
-  }, [selectedContent?.reviewerId]);
+    // Aminah Update: fetch current reviewer name when content changes, prioritizing reviewerId then suggestedReviewerId
+    const reviewerId =
+      selectedContent?.reviewerId || selectedContent?.suggestedReviewerId;
+    fetchReviewerName(reviewerId);
+  }, [selectedContent?.reviewerId, selectedContent?.suggestedReviewerId]);
 
   // ---- Wrapped handlers ----
   const handleValidate = async () => {
@@ -154,8 +157,7 @@ const Workflow = () => {
       };
 
       if (assignedReviewerId) {
-        updatePayload.reviewerId = assignedReviewerId;
-        updatePayload.assignedAt = new Date().toISOString();
+        updatePayload.suggestedReviewerId = assignedReviewerId;
       }
 
       await updateDoc(doc(db, "content", selectedContent.id), updatePayload);
@@ -185,6 +187,7 @@ const Workflow = () => {
           setSelectedContent(movedItem);
           setValidationResult(movedItem.validation || null);
           setShowValidationPanel(!!movedItem.validation);
+          setSelectedReviewer(null);
         }
 
         setSelectedStage("Review");
@@ -194,7 +197,7 @@ const Workflow = () => {
 
       showAlert(
         assignedReviewerId
-          ? "✅ Content passed! Moved to Review stage with reviewer assigned."
+          ? "✅ Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
           : "✅ Content passed! Moved to Review stage.",
         "success",
       );
@@ -250,17 +253,23 @@ const Workflow = () => {
   };
 
   const handleAssignReviewerClick = async () => {
+    const effectiveReviewerId =
+      selectedReviewer ||
+      selectedContent?.suggestedReviewerId ||
+      selectedContent?.reviewerId;
+
     const result = await handleAssignReviewer(
       user,
       selectedContent,
-      selectedReviewer,
+      effectiveReviewerId,
       showAlert,
     );
 
     if (result) {
       setSelectedContent({
         ...selectedContent,
-        reviewerId: selectedReviewer,
+        reviewerId: effectiveReviewerId,
+        suggestedReviewerId: null,
         assignedAt: new Date().toISOString(),
       });
       setSelectedReviewer(null);
@@ -270,6 +279,7 @@ const Workflow = () => {
 
   const handleSelectContent = (item) => {
     setSelectedContent(item);
+    setSelectedReviewer(null);
     setValidationResult(item.validation || null);
     setShowValidationPanel(!!item.validation);
     if (item.validatedTemplateId) {
