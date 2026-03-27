@@ -90,6 +90,11 @@ const handleManualScheduleSubmit = async () => {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
   const [templateTitles, setTemplateTitles] = useState([]);
+  const [driveFilesOpen, setDriveFilesOpen] = useState(false);
+const [driveFiles, setDriveFiles] = useState([]);
+const [driveLoading, setDriveLoading] = useState(false);
+const [driveError, setDriveError] = useState(null);
+const [driveUploadingId, setDriveUploadingId] = useState(null);
   // Abdalaa: This keeps track of which content card is currently asking AI
   // for a suggested posting time, so the button can show loading state.
   const [schedulingPostId, setSchedulingPostId] = useState(null);
@@ -361,6 +366,145 @@ const handleManualScheduleSubmit = async () => {
   };
 
 
+  const getAuthToken = async () => {
+    const current = auth.currentUser;
+    if (current) {
+      return await current.getIdToken();
+    }
+
+    try {
+      const session = JSON.parse(localStorage.getItem("userSession") || "null");
+      return (session && session.token) ? session.token : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleConnectDrive = async () => {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      setDriveError("You must be signed in.");
+      return;
+    }
+
+    const response = await fetch("/api/drive/oauth/start", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.authUrl) {
+      throw new Error(data.error || "Failed to start Drive connection.");
+    }
+
+    window.location.href = data.authUrl;
+  } catch (error) {
+    console.error("Connect Drive error:", error);
+    setDriveError(error.message || "Could not connect Drive.");
+  }
+};
+
+const handleOpenDriveImport = async () => {
+  try {
+    setDriveLoading(true);
+    setDriveError(null);
+
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("You must be signed in.");
+    }
+
+    const response = await fetch("/api/drive/files?pageSize=25", {
+      headers: { Authorization: "Bearer " + token }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to load Drive files.");
+    }
+
+    setDriveFiles(data.files || []);
+    setDriveFilesOpen(true);
+  } catch (error) {
+    console.error("Open Drive import error:", error);
+    setDriveError(error.message || "Could not open Drive files.");
+  } finally {
+    setDriveLoading(false);
+  }
+};
+
+const handleImportFileToContent = async (fileId) => {
+  try {
+    setDriveLoading(true);
+    setDriveError(null);
+
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("You must be signed in.");
+    }
+
+    const response = await fetch("/api/drive/import-content", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token
+      },
+      body: JSON.stringify({ fileId: fileId })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Import failed.");
+    }
+
+    setDriveFilesOpen(false);
+    await fetchContent(user);
+    showAlert("Imported from Drive: " + (data.title || "Untitled"));
+  } catch (error) {
+    console.error("Import file error:", error);
+    setDriveError(error.message || "Could not import Drive file.");
+  } finally {
+    setDriveLoading(false);
+  }
+};
+
+const handleUploadContentToDrive = async (item) => {
+  try {
+    setDriveUploadingId(item.id);
+    setDriveError(null);
+
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("You must be signed in.");
+    }
+
+    const response = await fetch("/api/drive/upload-content", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token
+      },
+      body: JSON.stringify({ contentId: item.id })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Upload failed.");
+    }
+
+    await fetchContent(user);
+    showAlert("Uploaded to Drive successfully.");
+  } catch (error) {
+    console.error("Upload to Drive error:", error);
+    setDriveError(error.message || "Could not upload content to Drive.");
+  } finally {
+    setDriveUploadingId(null);
+  }
+};
+
   if (!user && !loading) {
     return (
       <div className="dashboard">
@@ -393,6 +537,19 @@ const handleManualScheduleSubmit = async () => {
             <div className="dashboard-card-desc">Start a new post. Choose a template and write your content.</div>
             <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
               + Create Content
+            </button>
+            <button
+              className="dashboard-card-btn secondary drive-btn"
+              onClick={handleOpenDriveImport}
+              disabled={driveLoading}
+            >
+              {driveLoading ? "Loading Drive Files..." : "Import from Drive"}
+            </button>
+            <button
+              className="dashboard-card-btn secondary drive-btn"
+              onClick={handleConnectDrive}
+            >
+              Connect Google Drive
             </button>
           </div>
         </div>
@@ -440,6 +597,7 @@ const handleManualScheduleSubmit = async () => {
 
       {error && <div className="error-alert">{error}</div>}
       {scheduleError && <div className="error-alert">{scheduleError}</div>}
+      {driveError && <div className="error-alert">{driveError}</div>}
 
       {loading ? (
         <div className="loading">Loading your content...</div>
@@ -477,6 +635,14 @@ const handleManualScheduleSubmit = async () => {
                 <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
               <div className="dashboard-content-type">{item.type || templateTitles[item.templateId] || item.category || item.name || "Company Announcement"}</div>
+              <button
+                className="dashboard-card-btn secondary-schedule-btn"
+                onClick={() => handleUploadContentToDrive(item)}
+                disabled={driveUploadingId === item.id}
+                style={{ marginTop: "8px", marginBottom: "8px" }}
+              >
+                {driveUploadingId === item.id ? "Uploading..." : "Upload to Drive"}
+              </button>
               
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}
@@ -642,6 +808,40 @@ const handleManualScheduleSubmit = async () => {
                   Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+    { /* Drive Files Modal */ }
+      {driveFilesOpen && (
+        <div className="modal-overlay" onClick={() => setDriveFilesOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Select a Drive File</h3>
+              <button className="modal-close" onClick={() => setDriveFilesOpen(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {driveFiles.length === 0 ? (
+                <p>No files found.</p>
+              ) : (
+                <div className="drive-file-list">
+                  {driveFiles.map((f) => (
+                    <div key={f.id} className="drive-file-row">
+                      <div>
+                        <div className="drive-file-name">{f.name}</div>
+                        <div className="drive-file-meta">{f.mimeType}</div>
+                      </div>
+                      <button
+                        className="btn-save"
+                        onClick={() => handleImportFileToContent(f.id)}
+                        disabled={driveLoading}
+                      >
+                        Import
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

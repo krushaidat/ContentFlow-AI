@@ -89,6 +89,10 @@ const teamRoutes = require("./routes/teamRoutes");
 app.use("/api/team", teamRoutes);
 console.log("✓ Team routes loaded");
 
+const driveRoutes = require("./routes/driveRoutes");
+app.use("/api/drive", driveRoutes);
+console.log("✓ Drive routes loaded");
+
 console.log("Starting server on port", PORT);
 app.listen(PORT, () => {
   console.log(`✓✓✓ SERVER RUNNING ON PORT ${PORT} ✓✓✓`);

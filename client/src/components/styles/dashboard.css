@@ -177,8 +177,6 @@
   margin-top: 8px;
 }
 
-
-
 /* Top Row - Two Cards */
 .dashboard-top-row {
   display: grid;
@@ -869,4 +867,34 @@
   .dashboard-filter-wrap {
     align-items: stretch;
   }
+}
+
+.drive-btn {
+  margin-top: 8px;
+}
+
+.drive-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drive-file-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.drive-file-name {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.drive-file-meta {
+  font-size: 12px;
+  color: #6b7280;
 }
