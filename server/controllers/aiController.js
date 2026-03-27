@@ -94,13 +94,62 @@ function enqueue(fn) {
   return queue;
 }
 
-// Retry with exponential backoff
+
+
+// Abdalaa: Gemini sometimes returns extra text or half-finished formatting.
+// This helper tries a few cleanup steps before giving up.
+function safeParseGeminiJson(text) {
+  if (!text || typeof text !== "string") {
+    throw new Error("Gemini returned empty response.");
+  }
+
+  const trimmed = text.trim();
+
+  if (
+    trimmed === "Here is the JSON requested:" ||
+    trimmed === "Here is the JSON requested:\n```json" ||
+    trimmed.endsWith("```json")
+  ) {
+    throw new Error("Gemini returned only an intro sentence with no JSON.");
+  }
+
+  // Try direct parse
+  try {
+    return JSON.parse(trimmed);
+  } catch (_) {}
+
+  // Remove markdown fences
+  const cleaned = trimmed
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (_) {}
+
+  // Try extracting the JSON object from inside extra text
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const jsonSlice = cleaned.slice(firstBrace, lastBrace + 1);
+    return JSON.parse(jsonSlice);
+  }
+
+  throw new Error(`Could not parse Gemini JSON. Raw response: ${cleaned}`);
+}
+
+
 async function callWithRetry(model, prompt, retries = 3) {
   for (let i = 0; i <= retries; i++) {
     try {
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      return JSON.parse(text);
+
+      // Abdalaa: use safer parsing so Gemini does not fail
+      // just because it added a sentence before the JSON.
+      return safeParseGeminiJson(text);
     } catch (err) {
       const retryable =
         err?.status === 429 ||
@@ -114,6 +163,7 @@ async function callWithRetry(model, prompt, retries = 3) {
         await new Promise((r) => setTimeout(r, wait));
         continue;
       }
+
       throw err;
     }
   }
@@ -289,73 +339,251 @@ DRAFT SO FAR:
   }
 };
 
-// POST /api/ai/suggest-post-time (Abdalaa)
+// Abdalaa: build a realistic set of candidate slots for AI scheduling.
+// Gemini should choose from these free slots instead of inventing its own.
+function buildCandidateSlots(rangeDays = 3) {
+  const candidateTimes = ["09:00", "11:00", "14:00", "16:00", "18:00"];
+  const slots = [];
+  const today = new Date();
+
+  for (let i = 0; i < Number(rangeDays); i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+
+    const dateStr = d.toISOString().split("T")[0];
+
+    for (const time of candidateTimes) {
+      slots.push(`${dateStr} ${time}`);
+    }
+  }
+
+  return slots;
+
+}
+// Abdalaa: remove already occupied slots so AI only sees real free options.
+function filterFreeSlots(candidateSlots, occupiedSlots) {
+  const occupiedSet = new Set(
+    occupiedSlots.map((slot) => `${slot.date} ${slot.time}`)
+  );
+
+  return candidateSlots.filter((slot) => !occupiedSet.has(slot));
+}
+
+
+// Abdalaa: AI scheduling should pick one real free slot from a prepared list.
+
 exports.suggestPostTime = async (req, res) => {
   try {
-    const { postId, userId } = req.body;
-    if (!postId || !userId) return res.status(400).json({ error: "postId and userId required." });
+    const { postId, userId, rangeDays = 3 } = req.body;
+
+    if (!postId || !userId) {
+      return res.status(400).json({ error: "postId and userId required." });
+    }
 
     const postDoc = await db.collection("content").doc(postId).get();
-    if (!postDoc.exists) return res.status(404).json({ error: "Content not found." });
+    if (!postDoc.exists) {
+      return res.status(404).json({ error: "Content not found." });
+    }
+
     const post = postDoc.data();
 
-    const slots = await db.collection("calendarSlots").where("userId", "==", userId).get();
-    const occupied = slots.docs.map((d) => d.data());
-    const slotsText = occupied.length
-      ? occupied.map((s) => `${s.date} ${s.time} (${s.slotStatus})`).join(", ")
-      : "None";
+    const slotsSnapshot = await db
+      .collection("calendarSlots")
+      .where("userId", "==", userId)
+      .get();
 
-    const model = createModel(schedulingSchema, 256);
-    const prompt = `Suggest the best posting date/time. Title: "${post.title}". Occupied: ${slotsText}`;
+    const occupied = slotsSnapshot.docs.map((d) => d.data());
 
-    let result, usedFallback = false;
+    const candidateSlots = buildCandidateSlots(rangeDays);
+    const freeSlots = filterFreeSlots(candidateSlots, occupied);
+
+    if (freeSlots.length === 0) {
+      return res.status(400).json({
+        error: "No free scheduling slots found in the selected range.",
+      });
+    }
+
+    const freeSlotsText = freeSlots.join(", ");
+
+    let result;
+    let usedFallback = false;
+
     try {
-      result = await callGemini(model, prompt);
-    } catch {
+      const prompt = `
+Return ONLY raw JSON.
+No markdown.
+No explanation.
+No code fences.
+
+Format:
+{"chosenSlot":"YYYY-MM-DD HH:MM","reason":"Short explanation"}
+
+Post title: "${post.title || "Untitled"}"
+Post content: "${post.text || ""}"
+
+Choose exactly one slot from this list:
+${freeSlotsText}
+      `.trim();
+
+      const rawResult = await genAI
+        .getGenerativeModel({ model: "gemini-2.5-flash" })
+        .generateContent(prompt);
+
+      const rawText = rawResult.response.text();
+
+      console.log(" debug - raw Gemini scheduling text:", rawText);
+
+      const parsed = safeParseGeminiJson(rawText);
+
+      if (!parsed.chosenSlot || !freeSlots.includes(parsed.chosenSlot)) {
+        throw new Error("Gemini chose an invalid or unavailable slot.");
+      }
+
+      const [suggestedDate, suggestedTime] = parsed.chosenSlot.split(" ");
+
+      result = {
+        suggestedDate,
+        suggestedTime,
+        reason: parsed.reason || "Chosen by Gemini from the available free slots.",
+      };
+    } catch (err) {
+      console.warn("Gemini scheduling fallback:", err.message);
       usedFallback = true;
-      result = { suggestedDate: new Date().toISOString().split("T")[0], suggestedTime: "10:00", reason: "Fallback — AI unavailable." };
+
+      // Abdalaa: if Gemini fails still schedule the first free slot
+      // so the feature stays useful instead of failing completely.
+      const [fallbackDate, fallbackTime] = freeSlots[0].split(" ");
+
+      result = {
+        suggestedDate: fallbackDate,
+        suggestedTime: fallbackTime,
+        reason: "Fallback — first available free slot was used.",
+      };
     }
 
     await db.collection("calendarSlots").add({
-      userId, postId, title: post.title || "Untitled",
-      date: result.suggestedDate, time: result.suggestedTime,
-      reason: result.reason, slotStatus: "scheduled", createdAt: new Date(),
+      userId,
+      postId,
+      title: post.title || "Untitled",
+      date: result.suggestedDate,
+      time: result.suggestedTime,
+      reason: result.reason,
+      slotStatus: "scheduled",
+      createdAt: new Date(),
+      rangeDays: Number(rangeDays),
     });
 
     if (!usedFallback) {
       await db.collection("aiSuggestions").add({
-        userId, postId, title: post.title || "Untitled",
-        reason: result.reason, suggestedDate: result.suggestedDate,
-        suggestedTime: result.suggestedTime, status: "idea", createdAt: new Date(),
+        userId,
+        postId,
+        title: post.title || "Untitled",
+        reason: result.reason,
+        suggestedDate: result.suggestedDate,
+        suggestedTime: result.suggestedTime,
+        status: "idea",
+        createdAt: new Date(),
+        rangeDays: Number(rangeDays),
       });
     }
 
-    return res.json({ success: true, ...result, source: usedFallback ? "fallback" : "gemini" });
+    return res.json({
+      success: true,
+      ...result,
+      source: usedFallback ? "fallback" : "gemini",
+    });
   } catch (err) {
     console.error("Suggest post time error:", err);
-    return res.status(500).json({ error: "Failed to suggest time.", details: err.message });
+    return res.status(500).json({
+      error: "Failed to suggest time.",
+      details: err.message,
+    });
   }
 };
 
-// POST /api/ai/manual-schedule (Abdalaa — unchanged)
+
+// Abdalaa manual scheduling should allow any date/time the user wants
+// I also added repeat support so one action can create multiple future slots.
 exports.manualSchedulePost = async (req, res) => {
   try {
-    const { postId, userId, date, time } = req.body;
+    const {
+      postId,
+      userId,
+      date,
+      time,
+      repeatType = "none",
+      repeatCount = 1,
+    } = req.body;
+
     if (!postId || !userId || !date || !time) {
-      return res.status(400).json({ error: "postId, userId, date, and time required." });
+      return res.status(400).json({
+        error: "postId, userId, date, and time required.",
+      });
     }
 
     const postDoc = await db.collection("content").doc(postId).get();
-    if (!postDoc.exists) return res.status(404).json({ error: "Content not found." });
+    if (!postDoc.exists) {
+      return res.status(404).json({ error: "Content not found." });
+    }
 
+    const postTitle = postDoc.data().title || "Untitled";
+
+    // Abdalaa: save the first scheduled slot
     await db.collection("calendarSlots").add({
-      userId, postId, title: postDoc.data().title || "Untitled",
-      date, time, reason: "Scheduled manually.", slotStatus: "scheduled", createdAt: new Date(),
+      userId,
+      postId,
+      title: postTitle,
+      date,
+      time,
+      reason: "Scheduled manually.",
+      slotStatus: "scheduled",
+      createdAt: new Date(),
+      repeatType,
+      repeatCount: Number(repeatCount),
     });
 
-    return res.json({ success: true, date, time });
+    // Abdalaa: if repeat is enabled, create extra future slots too.
+    if (repeatType !== "none" && Number(repeatCount) > 1) {
+      const baseDate = new Date(date);
+
+      for (let i = 1; i < Number(repeatCount); i++) {
+        const nextDate = new Date(baseDate);
+
+        if (repeatType === "daily") {
+          nextDate.setDate(baseDate.getDate() + i);
+        } else if (repeatType === "weekly") {
+          nextDate.setDate(baseDate.getDate() + i * 7);
+        } else if (repeatType === "monthly") {
+          nextDate.setMonth(baseDate.getMonth() + i);
+        }
+
+        const nextDateStr = nextDate.toISOString().split("T")[0];
+
+        await db.collection("calendarSlots").add({
+          userId,
+          postId,
+          title: postTitle,
+          date: nextDateStr,
+          time,
+          reason: `Repeated ${repeatType} schedule.`,
+          slotStatus: "scheduled",
+          createdAt: new Date(),
+          repeatType,
+          repeatCount: Number(repeatCount),
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      date,
+      time,
+    });
   } catch (err) {
     console.error("Manual schedule error:", err);
-    return res.status(500).json({ error: "Failed to schedule.", details: err.message });
+    return res.status(500).json({
+      error: "Failed to schedule.",
+      details: err.message,
+    });
   }
 };
