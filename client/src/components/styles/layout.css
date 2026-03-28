@@ -277,6 +277,215 @@
   gap: 8px;
 }
 
+
+/* Updated by Aminah:
+- Refined the styles for the topbar icons to create a more modern and interactive feel.
+- Added subtle hover and active states with smooth transitions for better user feedback.
+- The notification badge now has a vibrant gradient background and a shadow to make it stand out.
+- The notifications panel has been styled with a frosted glass effect and a clean layout for better readability.
+- Overall, these updates enhance the visual appeal and usability of the topbar components. 
+*/
+
+
+.topbar-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(15, 23, 36, 0.08);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.topbar-icon-btn:hover,
+.topbar-icon-btn[aria-expanded="true"] {
+  transform: translateY(-1px);
+  border-color: rgba(79, 70, 229, 0.22);
+  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.14);
+}
+
+.topbar-icon-btn:focus,
+.topbar-icon-btn:focus-visible {
+  outline: 2px solid rgba(79, 70, 229, 0.18);
+  outline-offset: 2px;
+}
+
+.topbar-icon-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dark);
+}
+
+.topbar-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.28);
+}
+
+.notifications-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 52px;
+  width: min(360px, calc(100vw - 48px));
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  box-shadow: 0 24px 50px rgba(15, 23, 36, 0.18);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 60;
+  backdrop-filter: blur(18px);
+}
+
+.notifications-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notifications-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.notifications-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.notifications-panel > .notification-featured {
+  display: none !important;
+}
+
+.mark-all-read {
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  background: rgba(79, 70, 229, 0.06);
+  color: #4338ca;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.mark-all-read:hover {
+  background: rgba(79, 70, 229, 0.12);
+  border-color: rgba(79, 70, 229, 0.24);
+  transform: translateY(-1px);
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.notification-item {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.notification-item:hover,
+.notification-item.active {
+  border-color: rgba(79, 70, 229, 0.24);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.08);
+}
+
+.notification-item.unread {
+  background: linear-gradient(180deg, rgba(238, 242, 255, 0.68), rgba(255, 255, 255, 1));
+}
+
+.notification-item-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+  margin-top: 6px;
+}
+
+.notification-item.unread .notification-item-dot {
+  background: #4f46e5;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}
+
+.notification-item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notification-item-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.notification-item-copy span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.notification-item-message {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dark);
+}
+
+.notification-time {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
 .avatar-menu {
   position: absolute;
   top: calc(100% + 10px);
@@ -385,5 +594,10 @@
   }
   .content-area {
     margin-top: 140px;
+  }
+
+  .notifications-panel {
+    right: 0;
+    width: min(360px, calc(100vw - 32px));
   }
 }
