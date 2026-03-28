@@ -431,3 +431,98 @@
   flex-shrink: 0;
 }
 
+/* ===========================
+   CreateContent Modal Styles
+   Author: Aminah (original)
+   AI Assist styles: Tanvir
+   =========================== */
+
+.templates-header { background: none; border-bottom: none; padding: 24px 24px 0 24px; display: flex; align-items: center; justify-content: space-between; }
+.templates-header-left { display: flex; flex-direction: column; gap: 4px; }
+.templates-header-icon { font-size: 28px; color: #7c3aed; margin-bottom: 4px; }
+.templates-header-desc { font-size: 14px; color: #6b7280; }
+.templates-search-row { padding: 0 24px 16px 24px; }
+.templates-search { width: 100%; padding: 12px; background: #fff; color: #000; border-radius: 6px; border: 1px solid #d1d5db; font-size: 15px; }
+
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s ease-out; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 24px; border-bottom: 1px solid #e5e7eb; }
+.modal-header h2 { margin: 0; font-size: 20px; font-weight: 600; color: #111827; }
+.modal-close { background: none; border: none; font-size: 28px; cursor: pointer; color: #6b7280; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: background-color 0.2s, color 0.2s; }
+.modal-close:hover { background-color: #f3f4f6; color: #111827; }
+
+.create-content-form { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 8px; }
+.form-group label { font-size: 14px; font-weight: 500; color: #374151; }
+.form-group input, .form-group textarea, .form-group select { padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; font-family: inherit; transition: border-color 0.2s, box-shadow 0.2s; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+.form-group input:disabled, .form-group textarea:disabled, .form-group select:disabled { background-color: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+.form-group textarea { resize: vertical; min-height: 150px; }
+
+.create-template-form #text, .create-template-form #stage, .create-content-form #title, .create-content-form #text, .create-content-form #stage { background: #fff; color: #000; }
+.create-template-form #stage option, .create-content-form #stage option { background: #fff; color: #000; }
+
+.error-message { padding: 12px; background-color: #fee2e2; color: #991b1b; border-radius: 6px; font-size: 14px; border-left: 4px solid #dc2626; }
+
+.modal-actions { display: flex; gap: 12px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid #e5e7eb; }
+.btn-cancel, .btn-submit { padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; }
+.btn-cancel { background-color: #f3f4f6; color: #374151; }
+.btn-cancel:hover:not(:disabled) { background-color: #e5e7eb; }
+.btn-submit { background-color: #7c3aed; color: white; }
+.btn-submit:hover:not(:disabled) { background-color: #6d28d9; }
+.btn-cancel:disabled, .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Templates overlay */
+.templates-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.45); display: flex; justify-content: center; align-items: center; z-index: 1100; }
+.templates-panel { background: #ffffff; width: 94%; max-width: 900px; height: 70vh; border-radius: 10px; box-shadow: 0 10px 40px rgba(2,6,23,0.2); display: flex; flex-direction: column; overflow: hidden; }
+.templates-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; padding: 0 24px 24px 24px; }
+
+.template-card { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; height: 250px; padding: 14px; border-radius: 8px; border: 1px solid #eef2ff; background: linear-gradient(180deg, #ffffff, #fbfbff); cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; overflow: hidden; }
+.template-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(15,23,42,0.06); border-color: #e6e9ff; }
+.template-card-icon { font-size: 32px; background: #f3e8ff; border-radius: 8px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+.template-card-body { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.template-card-title { font-weight: 600; color: #111827; font-size: 16px; }
+.template-card-desc { color: #6b7280; font-size: 13px; }
+.template-card-meta { color: #9ca3af; font-size: 12px; }
+.template-card-actions { margin-left: 0; margin-top: 10px; flex-shrink: 0; }
+.btn-template-select { background: #7c3aed; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.btn-template-select:hover { background: #6d28d9; }
+
+.templates-panel .template-card { height: 250px; min-height: 250px; justify-content: flex-start; align-items: stretch; }
+.templates-panel .template-card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
+.templates-panel .template-card-body::-webkit-scrollbar { width: 6px; }
+.templates-panel .template-card-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
+.templates-panel .template-card-desc { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ===========================
+   AI Writing Assist Styles
+   =========================== */
+
+.content-group { position: relative; }
+
+.content-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.ai-assist-trigger { background: none; border: 1px solid rgba(124,58,237,0.25); color: #7c3aed; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.ai-assist-trigger:hover:not(:disabled) { background: rgba(124,58,237,0.08); border-color: rgba(124,58,237,0.4); }
+.ai-assist-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ai-assist-loading { display: inline-block; animation: aiSpin 0.8s linear infinite; }
+@keyframes aiSpin { to { transform: rotate(360deg); } }
+
+.ai-suggestions-panel { position: absolute; bottom: -8px; left: 0; right: 0; transform: translateY(100%); background: white; border: 1px solid rgba(124,58,237,0.2); border-radius: 10px; box-shadow: 0 8px 24px rgba(124,58,237,0.12); z-index: 10; overflow: hidden; animation: slideUp 0.2s ease-out; }
+
+.ai-suggestions-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(124,58,237,0.05); border-bottom: 1px solid rgba(124,58,237,0.1); }
+.ai-suggestions-label { font-size: 12px; font-weight: 700; color: #7c3aed; }
+.ai-suggestions-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #6b7280; padding: 0; line-height: 1; }
+.ai-suggestions-close:hover { color: #111827; }
+
+.ai-suggestions-list { display: flex; flex-direction: column; }
+
+.ai-suggestion-option { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: none; border: none; border-bottom: 1px solid #f3f4f6; cursor: pointer; text-align: left; transition: background 0.1s; }
+.ai-suggestion-option:last-child { border-bottom: none; }
+.ai-suggestion-option:hover { background: rgba(124,58,237,0.04); }
+
+.ai-suggestion-label { font-size: 11px; font-weight: 700; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.3px; }
+.ai-suggestion-preview { font-size: 13px; color: #374151; line-height: 1.4; }

@@ -22,22 +22,45 @@ export default function Dashboard() {
 ];
 const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 const [selectedPostForSchedule, setSelectedPostForSchedule] = useState(null);
+
+// Abdalaa: manual scheduling should let the user pick any date and time.
+// I also added repeat settings so one post can be scheduled more than once.
 const [manualSchedule, setManualSchedule] = useState({
   date: "",
   time: "",
+  repeatType: "none",
+  repeatCount: 1,
 });
+
+// Abdalaa: this range is only for AI scheduling.
+// Gemini should search for the best free slot inside this window.
+
+const [aiScheduleRangeDays, setAiScheduleRangeDays] = useState(3);
+
 const handleOpenScheduleModal = (item) => {
-  // Abdalaa: opening the manual scheduling modal for one specific post
+  // Abdalaa: open the manual scheduling modal for one post
+  // and reset the schedule form to a clean default state.
   setSelectedPostForSchedule(item);
-  setManualSchedule({ date: "", time: "" });
+  setManualSchedule({
+    date: "",
+    time: "",
+    repeatType: "none",
+    repeatCount: 1,
+  });
   setScheduleModalOpen(true);
 };
 
 const handleCloseScheduleModal = () => {
-  // Abdalaa: reset modal state when the user closes it
+  // Abdalaa: reset everything when the scheduling modal closes
+  // so old values do not stay stuck for the next post.
   setScheduleModalOpen(false);
   setSelectedPostForSchedule(null);
-  setManualSchedule({ date: "", time: "" });
+  setManualSchedule({
+    date: "",
+    time: "",
+    repeatType: "none",
+    repeatCount: 1,
+  });
 };
 
 const handleManualScheduleSubmit = async () => {
@@ -51,7 +74,9 @@ const handleManualScheduleSubmit = async () => {
 
     setScheduleError(null);
 
-    const response = await fetch("http://localhost:5000/api/ai/manual-schedule", {
+    // Abdalaa: manual scheduling should allow any date/time,
+    // and it can also repeat daily, weekly, or monthly.
+    const response = await fetch("http://localhost:5050/api/ai/manual-schedule", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,6 +86,8 @@ const handleManualScheduleSubmit = async () => {
         userId: user.uid,
         date: manualSchedule.date,
         time: manualSchedule.time,
+        repeatType: manualSchedule.repeatType,
+        repeatCount: Number(manualSchedule.repeatCount),
       }),
     });
 
@@ -78,6 +105,7 @@ const handleManualScheduleSubmit = async () => {
     setScheduleError(error.message || "Could not schedule post.");
   }
 };
+
   const [content, setContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -280,16 +308,14 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
     }
   };
 
-    // Abdalaa: This sends the selected content item to the backend,
-  // asks Gemini for the best posting time based on the calendar,
-  // and saves the result into Firestore as a scheduled slot.
-
   const handleSuggestPostingTime = async (item) => {
     try {
       setSchedulingPostId(item.id);
       setScheduleError(null);
-
-      const response = await fetch("http://localhost:5000/api/ai/suggest-post-time", {
+  
+      // Abdalaa: AI scheduling should search for the best free slot
+      // inside the selected future window.
+      const response = await fetch("http://localhost:5050/api/ai/suggest-post-time", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -297,28 +323,26 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
         body: JSON.stringify({
           postId: item.id,
           userId: user.uid,
+          rangeDays: Number(aiScheduleRangeDays),
         }),
       });
-
+  
       const data = await response.json();
-
+  
       if (!response.ok) {
         throw new Error(data.error || "Failed to suggest posting time.");
       }
-
-      // Abdalaa: Refreshing content after scheduling so the UI stays current.
+  
       await fetchContent(user);
-
+  
       const sourceLabel =
-      data.source === "gemini"
-        ? "Gemini picked this time"
-        : "Fallback time was used because Gemini was unavailable";
-
-    showAlert(
-      `${sourceLabel}\nScheduled for ${data.suggestedDate} at ${data.suggestedTime}`
-    );
-
-      
+        data.source === "gemini"
+          ? "Gemini picked the best free slot"
+          : "Fallback picked the first free slot because Gemini response was invalid";
+  
+      showAlert(
+        `${sourceLabel}\nScheduled for ${data.suggestedDate} at ${data.suggestedTime}`
+      );
     } catch (error) {
       console.error("Error suggesting posting time:", error);
       setScheduleError(error.message || "Could not suggest posting time.");
@@ -661,27 +685,43 @@ const handleUploadContentToDrive = async (item) => {
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}
                 {item.stage === "Ready to Post" && (
-                  <>
-                    <button
-                      className="dashboard-card-btn schedule-btn"
-                      onClick={() => handleSuggestPostingTime(item)}
-                      disabled={schedulingPostId === item.id}
-                      style={{ marginTop: "8px", marginBottom: "8px" }}
-                    >
-                      {schedulingPostId === item.id
-                        ? "Suggesting Time..."
-                        : "Suggest Posting Time Using AI"}
-                    </button>
+  <>
+    <div className="form-group" style={{ marginTop: "8px", marginBottom: "8px" }}>
+      <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>
+        AI Scheduling Window
+      </label>
+      <select
+        className="edit-select"
+        value={aiScheduleRangeDays}
+        onChange={(e) => setAiScheduleRangeDays(Number(e.target.value))}
+      >
+        <option value={1}>Next 1 day</option>
+        <option value={2}>Next 2 days</option>
+        <option value={3}>Next 3 days</option>
+        <option value={7}>Next 7 days</option>
+      </select>
+    </div>
 
-                    <button
-                      className="dashboard-card-btn secondary-schedule-btn"
-                      onClick={() => handleOpenScheduleModal(item)}
-                      style={{ marginTop: "0px", marginBottom: "8px" }}
-                    >
-                      Schedule This Post
-                    </button>
-                  </>
-                )}
+    <button
+      className="dashboard-card-btn schedule-btn"
+      onClick={() => handleSuggestPostingTime(item)}
+      disabled={schedulingPostId === item.id}
+      style={{ marginTop: "8px", marginBottom: "8px" }}
+    >
+      {schedulingPostId === item.id
+        ? "Suggesting Time..."
+        : "Suggest Posting Time Using AI"}
+    </button>
+
+    <button
+      className="dashboard-card-btn secondary-schedule-btn"
+      onClick={() => handleOpenScheduleModal(item)}
+      style={{ marginTop: "0px", marginBottom: "8px" }}
+    >
+      Schedule This Post
+    </button>
+  </>
+)}
 
             </div>
           ))}
@@ -760,31 +800,69 @@ const handleUploadContentToDrive = async (item) => {
       </div>
 
       <div className="modal-body">
-        <div className="form-group">
-          <label htmlFor="manual-schedule-date">Date</label>
-          <input
-            id="manual-schedule-date"
-            type="date"
-            value={manualSchedule.date}
-            onChange={(e) =>
-              setManualSchedule({ ...manualSchedule, date: e.target.value })
-            }
-            className="edit-input"
-          />
-        </div>
+      <div className="form-group">
+  <label htmlFor="manual-schedule-date">Date</label>
+  <input
+    id="manual-schedule-date"
+    type="date"
+    value={manualSchedule.date}
+    onChange={(e) =>
+      setManualSchedule({ ...manualSchedule, date: e.target.value })
+    }
+    className="edit-input"
+  />
+</div>
 
-        <div className="form-group">
-          <label htmlFor="manual-schedule-time">Time</label>
-          <input
-            id="manual-schedule-time"
-            type="time"
-            value={manualSchedule.time}
-            onChange={(e) =>
-              setManualSchedule({ ...manualSchedule, time: e.target.value })
-            }
-            className="edit-input"
-          />
-        </div>
+<div className="form-group">
+  <label htmlFor="manual-schedule-time">Time</label>
+  <input
+    id="manual-schedule-time"
+    type="time"
+    value={manualSchedule.time}
+    onChange={(e) =>
+      setManualSchedule({ ...manualSchedule, time: e.target.value })
+    }
+    className="edit-input"
+  />
+</div>
+
+<div className="form-group">
+  <label htmlFor="manual-repeat-type">Repeat</label>
+  <select
+    id="manual-repeat-type"
+    value={manualSchedule.repeatType}
+    onChange={(e) =>
+      setManualSchedule({ ...manualSchedule, repeatType: e.target.value })
+    }
+    className="edit-select"
+  >
+    <option value="none">Do not repeat</option>
+    <option value="daily">Daily</option>
+    <option value="weekly">Weekly</option>
+    <option value="monthly">Monthly</option>
+  </select>
+</div>
+
+{manualSchedule.repeatType !== "none" && (
+  <div className="form-group">
+    <label htmlFor="manual-repeat-count">Repeat Count</label>
+    <input
+      id="manual-repeat-count"
+      type="number"
+      min="1"
+      max="30"
+      value={manualSchedule.repeatCount}
+      onChange={(e) =>
+        setManualSchedule({
+          ...manualSchedule,
+          repeatCount: Number(e.target.value),
+        })
+      }
+      className="edit-input"
+    />
+  </div>
+)}
+          
 
         <div className="modal-actions">
           <button

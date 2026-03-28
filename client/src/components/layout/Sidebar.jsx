@@ -74,7 +74,7 @@ const Sidebar = () => {
 
       <div className="sidebar-bottom">
         <div className="sidebar-actions">
-          <button className="action-item" onClick={() => handleNavigate('/settings')}>
+          <button className="action-item" onClick={() => handleNavigate('/profile')}>
             <img src={settingIcon} alt="settings" style={{width:16,height:16,marginRight:8}} />
             Settings
           </button>
