@@ -112,6 +112,12 @@ async function getDriveForUser(uid) {
   return { driveApi, oauth2Client, userRef };
 }
 
+/**
+ * startOAuth — begins the Google OAuth 2.0 authorization flow.
+ * Generates a time-limited, HMAC-signed state token to prevent CSRF,
+ * then returns the Google consent-screen URL to the client so it can
+ * redirect the user's browser there.
+ */
 exports.startOAuth = async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -129,6 +135,9 @@ exports.startOAuth = async (req, res) => {
       prompt: "consent",
       include_granted_scopes: true,
       scope: [
+        // drive.readonly — required to browse existing files, folders, and Shared Drives
+        "https://www.googleapis.com/auth/drive.readonly",
+        // drive.file — required to upload/create new files on behalf of the user
         "https://www.googleapis.com/auth/drive.file"
       ],
       state: state
@@ -141,6 +150,13 @@ exports.startOAuth = async (req, res) => {
   }
 };
 
+/**
+ * oauthCallback — handles the redirect back from Google after the user
+ * grants (or denies) consent. Verifies the state token, exchanges the
+ * authorization code for tokens, and stores the encrypted refresh token
+ * in the user's Firestore document so future requests can access Drive
+ * without re-prompting the user.
+ */
 exports.oauthCallback = async (req, res) => {
   const successRedirect = process.env.GOOGLE_OAUTH_SUCCESS_REDIRECT || "http://localhost:5173/dashboard?drive=connected";
   const errorRedirect = process.env.GOOGLE_OAUTH_ERROR_REDIRECT || "http://localhost:5173/dashboard?drive=error";
@@ -202,6 +218,11 @@ exports.oauthCallback = async (req, res) => {
   }
 };
 
+/**
+ * driveStatus — returns whether the current user has a connected Google
+ * Drive integration. Used by the Dashboard to show/hide the Drive buttons
+ * and to surface the last connection timestamp.
+ */
 exports.driveStatus = async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -221,23 +242,88 @@ exports.driveStatus = async (req, res) => {
   }
 };
 
+/**
+ * listDrives — returns all drives accessible to the user.
+ * Always prepends a virtual "My Drive" entry (the personal drive has no
+ * entry in the drives.list response), followed by any Shared Drives.
+ * Used by DriveBrowser to populate the drive-selector tabs.
+ */
+exports.listDrives = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { driveApi } = await getDriveForUser(uid);
+
+    // My Drive is always available — it has no entry in drives.list so we add it manually
+    const myDrive = { id: "root", name: "My Drive", kind: "personal" };
+
+    // Shared Drives require the drive.readonly scope.
+    // This call may return an empty list
+    // or a 403 — we catch that gracefully and just return My Drive.
+    let sharedDrives = [];
+    try {
+      const resp = await driveApi.drives.list({
+        pageSize: 50,
+        fields: "drives(id, name, kind)"
+      });
+      sharedDrives = resp.data.drives || [];
+    } catch (drivesErr) {
+      // Insufficient scope or no shared drives — non-fatal, continue with My Drive only
+      console.warn("listDrives: could not fetch shared drives:", drivesErr.message);
+    }
+
+    return res.json({ drives: [myDrive, ...sharedDrives] });
+  } catch (error) {
+    if (error.code === "DRIVE_NOT_CONNECTED") {
+      return res.status(400).json({ error: "Google Drive is not connected" });
+    }
+    console.error("listDrives error:", error.message);
+    return res.status(500).json({ error: "Failed to list drives" });
+  }
+};
+
+/**
+ * listFiles — lists files and folders inside a specific folder or drive root.
+ *
+ * Query params:
+ *   driveId   — the Drive to browse. "root" = My Drive, otherwise a Shared Drive ID.
+ *   folderId  — the folder to list the contents of. Omit to list the drive root.
+ *   pageToken — pagination cursor returned by a previous call.
+ *   pageSize  — max items per page (default 50).
+ *
+ * Results are ordered folders-first then alphabetically so the UI always
+ * shows navigable folders at the top of the list.
+ */
 exports.listFiles = async (req, res) => {
   try {
     const uid = req.user.uid;
     const { driveApi } = await getDriveForUser(uid);
 
-    const query = req.query.q || "trashed = false";
+    const folderId  = req.query.folderId  || null;
+    const driveId   = req.query.driveId   || null;
     const pageToken = req.query.pageToken || undefined;
-    const pageSize = Number(req.query.pageSize || 25);
+    const pageSize  = Math.min(Number(req.query.pageSize || 50), 100);
+
+    // Determine if we are browsing a Shared Drive
+    const isSharedDrive = driveId && driveId !== "root";
+
+    // If user is inside a folder, keep folder-scoped listing.
+    // If no folder selected, show all visible files in that drive scope.
+    const q = folderId
+      ? `'${folderId}' in parents and trashed = false`
+      : "trashed = false";
 
     const resp = await driveApi.files.list({
-      q: query,
-      pageToken: pageToken,
-      pageSize: pageSize,
-      corpora: "allDrives",
+      q,
+      pageToken,
+      pageSize,
+      // "drive" corpora is required when scoping to a specific Shared Drive
+      corpora: isSharedDrive ? "drive" : "user",
+      driveId: isSharedDrive ? driveId : undefined,
       includeItemsFromAllDrives: true,
       supportsAllDrives: true,
-      fields: "nextPageToken, files(id, name, mimeType, modifiedTime, webViewLink, driveId)"
+      // Show folders before files, then sort alphabetically within each group
+      orderBy: "folder,name",
+      fields: "nextPageToken, files(id, name, mimeType, modifiedTime, size, driveId)"
     });
 
     return res.json({
@@ -253,6 +339,14 @@ exports.listFiles = async (req, res) => {
   }
 };
 
+/**
+ * importDriveFileToContent — fetches a file from the user's Drive and
+ * creates a new content document in Firestore from its text.
+ * Google Docs are exported as plain text via the export API.
+ * All other files are downloaded directly and decoded as UTF-8.
+ * The resulting content is set to "Draft" stage so the user can review
+ * it before moving it through the workflow.
+ */
 exports.importDriveFileToContent = async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -313,6 +407,14 @@ exports.importDriveFileToContent = async (req, res) => {
   }
 };
 
+/**
+ * uploadContentToDrive — pushes a ContentFlow content item to the user's
+ * Google Drive as a plain-text file. If the content was previously
+ * uploaded (has a driveFileId), it updates the existing file in-place
+ * instead of creating a duplicate. Optionally accepts a folderId in the
+ * request body to place new files inside a specific folder.
+ * The Drive file ID and shareable link are saved back to Firestore.
+ */
 exports.uploadContentToDrive = async (req, res) => {
   try {
     const uid = req.user.uid;
@@ -394,6 +496,12 @@ exports.uploadContentToDrive = async (req, res) => {
   }
 };
 
+/**
+ * disconnectDrive — revokes the user's Google Drive integration by
+ * clearing the stored encrypted refresh token in Firestore and marking
+ * the connection as inactive. The user will need to go through OAuth
+ * again to reconnect.
+ */
 exports.disconnectDrive = async (req, res) => {
   try {
     const uid = req.user.uid;

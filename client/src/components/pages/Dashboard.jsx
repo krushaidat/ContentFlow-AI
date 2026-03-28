@@ -4,6 +4,7 @@ import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, addDoc } 
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
+import DriveBrowser from "../DriveBrowser";
 import { decrementTemplateUsage } from "../../functions/templateDB";
 import "../styles/dashboard.css";
 import useInPageAlert from "../../hooks/useInPageAlert";
@@ -90,9 +91,8 @@ const handleManualScheduleSubmit = async () => {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
   const [templateTitles, setTemplateTitles] = useState([]);
-  const [driveFilesOpen, setDriveFilesOpen] = useState(false);
-const [driveFiles, setDriveFiles] = useState([]);
-const [driveLoading, setDriveLoading] = useState(false);
+  // Drive browser modal visibility
+const [driveOpen, setDriveOpen] = useState(false);
 const [driveError, setDriveError] = useState(null);
 const [driveUploadingId, setDriveUploadingId] = useState(null);
   // Abdalaa: This keeps track of which content card is currently asking AI
@@ -407,74 +407,86 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
   }
 };
 
-const handleOpenDriveImport = async () => {
+/**
+ * ensureDriveConnected — checks whether the user already has an active
+ * Drive integration. If not connected, it starts the OAuth flow.
+ * Returns true only when already connected in the current session.
+ */
+const ensureDriveConnected = async () => {
+  const token = await getAuthToken();
+  if (!token) {
+    setDriveError("You must be signed in.");
+    return false;
+  }
+
+  const response = await fetch("/api/drive/status", {
+    method: "GET",
+    headers: { Authorization: "Bearer " + token }
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Could not check Drive status.");
+  }
+
+  if (!data.connected) {
+    showAlert("Please connect Google Drive to continue.");
+    await handleConnectDrive();
+    return false;
+  }
+
+  return true;
+};
+
+/**
+ * handleOpenDriveBrowser — opens the Drive browser only when the user is
+ * already connected. If not connected, it triggers OAuth first.
+ */
+const handleOpenDriveBrowser = async () => {
   try {
-    setDriveLoading(true);
     setDriveError(null);
-
-    const token = await getAuthToken();
-    if (!token) {
-      throw new Error("You must be signed in.");
-    }
-
-    const response = await fetch("/api/drive/files?pageSize=25", {
-      headers: { Authorization: "Bearer " + token }
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to load Drive files.");
-    }
-
-    setDriveFiles(data.files || []);
-    setDriveFilesOpen(true);
+    const connected = await ensureDriveConnected();
+    if (!connected) return;
+    setDriveOpen(true);
   } catch (error) {
-    console.error("Open Drive import error:", error);
-    setDriveError(error.message || "Could not open Drive files.");
-  } finally {
-    setDriveLoading(false);
+    console.error("Open Drive browser error:", error);
+    setDriveError(error.message || "Could not open Drive browser.");
   }
 };
 
-const handleImportFileToContent = async (fileId) => {
-  try {
-    setDriveLoading(true);
-    setDriveError(null);
+/**
+ * handleImportFromDrive — called by DriveBrowser when the user clicks
+ * "Import" on a file. Sends the fileId to the backend, which fetches
+ * the file text from Drive and creates a new Firestore content document.
+ */
+const handleImportFromDrive = async (fileId) => {
+  const token = await getAuthToken();
+  if (!token) throw new Error("You must be signed in.");
 
-    const token = await getAuthToken();
-    if (!token) {
-      throw new Error("You must be signed in.");
-    }
+  const response = await fetch("/api/drive/import-content", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    },
+    body: JSON.stringify({ fileId })
+  });
 
-    const response = await fetch("/api/drive/import-content", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + token
-      },
-      body: JSON.stringify({ fileId: fileId })
-    });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Import failed.");
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Import failed.");
-    }
-
-    setDriveFilesOpen(false);
-    await fetchContent(user);
-    showAlert("Imported from Drive: " + (data.title || "Untitled"));
-  } catch (error) {
-    console.error("Import file error:", error);
-    setDriveError(error.message || "Could not import Drive file.");
-  } finally {
-    setDriveLoading(false);
-  }
+  setDriveOpen(false);
+  await fetchContent(user);
+  showAlert("Imported from Drive: " + (data.title || "Untitled"));
 };
 
 const handleUploadContentToDrive = async (item) => {
   try {
     setDriveUploadingId(item.id);
     setDriveError(null);
+
+    const connected = await ensureDriveConnected();
+    if (!connected) return;
 
     const token = await getAuthToken();
     if (!token) {
@@ -540,16 +552,9 @@ const handleUploadContentToDrive = async (item) => {
             </button>
             <button
               className="dashboard-card-btn secondary drive-btn"
-              onClick={handleOpenDriveImport}
-              disabled={driveLoading}
+              onClick={handleOpenDriveBrowser}
             >
-              {driveLoading ? "Loading Drive Files..." : "Import from Drive"}
-            </button>
-            <button
-              className="dashboard-card-btn secondary drive-btn"
-              onClick={handleConnectDrive}
-            >
-              Connect Google Drive
+              Import from Drive
             </button>
           </div>
         </div>
@@ -587,6 +592,15 @@ const handleUploadContentToDrive = async (item) => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => fetchContent(user)}
+      />
+
+      {/* Drive file browser — supports exploring My Drive, Shared Drives,
+          and sub-folders before choosing a file to import */}
+      <DriveBrowser
+        isOpen={driveOpen}
+        onClose={() => setDriveOpen(false)}
+        getToken={getAuthToken}
+        onImport={handleImportFromDrive}
       />
 
       {/* AMINAH: Templates Modal */}
@@ -808,40 +822,6 @@ const handleUploadContentToDrive = async (item) => {
                   Delete
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-    { /* Drive Files Modal */ }
-      {driveFilesOpen && (
-        <div className="modal-overlay" onClick={() => setDriveFilesOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Select a Drive File</h3>
-              <button className="modal-close" onClick={() => setDriveFilesOpen(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              {driveFiles.length === 0 ? (
-                <p>No files found.</p>
-              ) : (
-                <div className="drive-file-list">
-                  {driveFiles.map((f) => (
-                    <div key={f.id} className="drive-file-row">
-                      <div>
-                        <div className="drive-file-name">{f.name}</div>
-                        <div className="drive-file-meta">{f.mimeType}</div>
-                      </div>
-                      <button
-                        className="btn-save"
-                        onClick={() => handleImportFileToContent(f.id)}
-                        disabled={driveLoading}
-                      >
-                        Import
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
