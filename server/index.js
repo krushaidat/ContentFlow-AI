@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT || 5000;
 const db = require("./config/firebase");
 
 const app = express();
