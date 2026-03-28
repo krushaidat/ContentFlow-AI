@@ -3,7 +3,7 @@
  * Authors: Tanvir (original), refactored
  */
 
-const db = require("../config/firebase");
+const { db } = require("../config/firebase");
 const { GoogleGenerativeAI, SchemaType } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);

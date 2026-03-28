@@ -393,15 +393,9 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
   const getAuthToken = async () => {
     const current = auth.currentUser;
     if (current) {
-      return await current.getIdToken();
+      return await current.getIdToken(true);
     }
-
-    try {
-      const session = JSON.parse(localStorage.getItem("userSession") || "null");
-      return (session && session.token) ? session.token : null;
-    } catch {
-      return null;
-    }
+    return null;
   };
 
   const handleConnectDrive = async () => {

@@ -15,6 +15,6 @@ if (admin.apps.length === 0) {
   console.log("Firebase Admin SDK already initialized");
 }
 
-// Export the Firestore database instance
+// Export the Firestore database instance and admin SDK
 const db = admin.firestore();
-module.exports = db;
+module.exports = { db, admin };

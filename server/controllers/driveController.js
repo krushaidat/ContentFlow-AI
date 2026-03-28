@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { google } = require("googleapis");
-const db = require("../config/firebase");
+const { db } = require("../config/firebase");
 
 function getRequiredEnv(name) {
   const value = process.env[name];
