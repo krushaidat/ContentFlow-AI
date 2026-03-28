@@ -27,6 +27,7 @@ export default function Team() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
 
   const isAdmin = useMemo(() => me?.role === "admin", [me]);
 /**DRAVEN
@@ -166,7 +167,61 @@ export default function Team() {
     } finally {
       setSaving(false);
     }
+  }; 
+  const handleRemoveMember = async (memberUid) => {
+    if (!isAdmin || !team?.id || !user?.uid) return;
+    setSaving(true);
+    setError("");
+    try{
+      const response = await fetch("http://localhost:5000/api/team/remove-member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminId: user.uid,
+          memberId: memberUid,
+          teamId: team.id,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to remove member.");
+      }
+      await loadTeamData();
+    }catch (e) {
+      setError(e.message || "Failed to remove member.");
+    }finally{
+      setSaving(false);
+    }
+  }
+  const handleSort = (key) => {
+    setSortConfig((prev) => 
+     prev.key === key
+      ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      : { key, dir: "asc" }
+    );
   };
+
+  /**DRAVEN This memoized value sorts the team members based on the current sort configuration (by name, email, or role). */
+  const sortedMembers = useMemo(() => {
+    if (!sortConfig.key) return members;
+    return [...members].sort((a, b) => {
+      let aVal = "";
+      let bVal = "";
+      if (sortConfig.key === "name") {
+        aVal = (a.firstName || "") + " " + (a.lastName || "") || a.displayName || "";
+        bVal = (b.firstName || "") + " " + (b.lastName || "") || b.displayName || "";
+      } else if (sortConfig.key === "email") {
+        aVal = a.email || "";
+        bVal = b.email || "";
+      } else if (sortConfig.key === "role") {
+        aVal = a.role || "";
+        bVal = b.role || "";
+      }
+      return sortConfig.dir === "asc"
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal);
+    });
+  }, [members, sortConfig]);
 
   if (loading) return <div className="team-page"><div className="team-card">Loading team...</div></div>;
 
@@ -227,13 +282,19 @@ export default function Team() {
               <table className="team-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
+                    <th className="team-th-sort" onClick={() => handleSort("name")}>
+                      Name {sortConfig.key === "name" ? (sortConfig.dir === "asc" ? "▲" : "▼") : "⇕"}
+                    </th>
+                    <th className="team-th-sort" onClick={() => handleSort("email")}>
+                      Email {sortConfig.key === "email" ? (sortConfig.dir === "asc" ? "▲" : "▼") : "⇕"}
+                    </th>
+                    <th className="team-th-sort" onClick={() => handleSort("role")}>
+                      Role {sortConfig.key === "role" ? (sortConfig.dir === "asc" ? "▲" : "▼") : "⇕"}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m) => (
+                  {sortedMembers.map((m) => (
                     <tr key={m.uid}>
                       <td>{(m.firstName || "") + " " + (m.lastName || "") || m.displayName || "Unknown"}</td>
                       <td>{m.email || "-"}</td>
@@ -255,6 +316,20 @@ export default function Team() {
                           <span className="team-role">{m.role || "user"}</span>
                         )}
                       </td>
+                      {isAdmin && (
+                        <td>
+                          {m.uid !== user?.uid && (
+                            <button
+                              className="team-btn-remove"
+                              disable={saving}
+                              onClick={() => handleRemoveMember(m.uid)}
+                              title="Remove member"
+                            >
+                              Remove
+                            </button>
+                          )}
+                          </td>
+                      )}
                     </tr>
                   ))}
                   {!members.length && (

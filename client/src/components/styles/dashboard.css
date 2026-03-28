@@ -179,8 +179,6 @@
   margin-top: 8px;
 }
 
-
-
 /* Top Row - Two Cards */
 .dashboard-top-row {
   display: grid;
@@ -405,6 +403,7 @@
   padding: 16px;
   border-radius: 8px;
   background: white;
+}
 /* Loading and Empty States */
 .loading {
   text-align: center;
@@ -807,4 +806,110 @@
 .review-status.rejected {
   background-color: #fee2e2;
   color: #991b1b;
-}}
+}
+
+.dashboard-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dashboard-search-wrap {
+  flex: 1;
+}
+
+.dashboard-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  background: #fff;
+  color: #111827;
+}
+
+.dashboard-search-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+.dashboard-filter-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.dashboard-filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.dashboard-stage-select {
+  min-width: 200px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+  color: #111827;
+  outline: none;
+  cursor: pointer;
+}
+
+.dashboard-stage-select:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+@media (max-width: 768px) {
+  .dashboard-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-search-wrap,
+  .dashboard-filter-wrap,
+  .dashboard-stage-select {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .dashboard-filter-wrap {
+    align-items: stretch;
+  }
+}
+
+.drive-btn {
+  margin-top: 8px;
+}
+
+.drive-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drive-file-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.drive-file-name {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.drive-file-meta {
+  font-size: 12px;
+  color: #6b7280;
+}

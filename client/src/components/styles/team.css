@@ -81,6 +81,27 @@
   cursor: not-allowed;
 }
 
+.team-btn-remove {
+  border: none;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.team-btn-remove:hover {
+  background: #fca5a5;
+}
+
+.team-btn-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .team-table-wrap {
   overflow-x: auto;
 }
@@ -127,4 +148,13 @@
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 14px;
+}
+
+.team-th-sort {
+  cursor: pointer;
+  user-select: none;
+}
+
+.team-th-sort:hover {
+  color: #6d35de;
 }

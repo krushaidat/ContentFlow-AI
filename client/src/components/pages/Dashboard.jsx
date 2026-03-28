@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, orderBy, addDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
+import DriveBrowser from "../DriveBrowser";
 import { decrementTemplateUsage } from "../../functions/templateDB";
 import "../styles/dashboard.css";
 import useInPageAlert from "../../hooks/useInPageAlert";
 import InPageAlert from "../InPageAlert";
 
 export default function Dashboard() {
-  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const ALL_STAGES = "All Stages";
+  const STAGES = [
+  ALL_STAGES,
+  "Draft",
+  "Review",
+  "Update",
+  "Ready to Post",
+  "Posted",
+];
+const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 const [selectedPostForSchedule, setSelectedPostForSchedule] = useState(null);
 
 // Abdalaa: manual scheduling should let the user pick any date and time.
@@ -101,12 +111,18 @@ const handleManualScheduleSubmit = async () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [selectedStage, setSelectedStage] = useState(ALL_STAGES);//Filter stages
+  const [search, setSearch] = useState("");
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
-  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
+  const [templateTitles, setTemplateTitles] = useState([]);
+  // Drive browser modal visibility
+const [driveOpen, setDriveOpen] = useState(false);
+const [driveError, setDriveError] = useState(null);
+const [driveUploadingId, setDriveUploadingId] = useState(null);
   // Abdalaa: This keeps track of which content card is currently asking AI
   // for a suggested posting time, so the button can show loading state.
   const [schedulingPostId, setSchedulingPostId] = useState(null);
@@ -128,6 +144,7 @@ const handleManualScheduleSubmit = async () => {
         // Only fetch content if user is authenticated
         // Prevents "User not authenticated" errors
         fetchContent();
+        fetchTemplateTitles();
       } else {
         setLoading(false);
         setError("Please sign in to view your content");
@@ -137,7 +154,12 @@ const handleManualScheduleSubmit = async () => {
 
     return () => unsubscribe();
   }, [navigate]);
-
+  
+  useEffect(() => {
+    if (selectedStage) {
+      fetchContent();
+    }
+  }, [selectedStage]);
   /** DRAVEN
    * Fetches content from Firestore for the authenticated user.
    * @param {*} user - The authenticated user object.
@@ -161,13 +183,17 @@ const handleManualScheduleSubmit = async () => {
       setLoading(false);
       return;
     }
+    setLoading(true);
     try {
-      setLoading(true);
       // Security fix: Filter by createdBy to only fetch user's own content
       // This matches Firestore security rules that allow reading only own documents
+      const filters = [where("createdBy", "==", currentUser.uid)];
+      if (selectedStage && selectedStage !== ALL_STAGES) {
+        filters.push(where("stage", "==", selectedStage));
+      }
       const q = query(
         collection(db, "content"),
-        where("createdBy", "==", currentUser.uid)
+        ...filters
       );
       const querySnapshot = await getDocs(q);
       // Performance fix: Sort on client-side instead of orderBy in query
@@ -186,6 +212,19 @@ const handleManualScheduleSubmit = async () => {
     }
   };
 
+  const fetchTemplateTitles = async () => {
+    try{  
+      const snapshot = await getDocs(collection(db, "templates"));
+      const titleMap={};
+      snapshot.forEach((templateDoc) => {
+        const data = templateDoc.data() || {};
+        titleMap[templateDoc.id] = data.title || "";
+      });
+      setTemplateTitles(titleMap);
+    } catch (err) {
+      console.error("Error fetching template titles:", err);
+    }
+  };
   /**
    * Returns the appropriate CSS class name for a status badge
    * based on the content's current stage (draft, planning, review, etc.)
@@ -351,6 +390,157 @@ const handleManualScheduleSubmit = async () => {
   };
 
 
+  const getAuthToken = async () => {
+    const current = auth.currentUser;
+    if (current) {
+      return await current.getIdToken();
+    }
+
+    try {
+      const session = JSON.parse(localStorage.getItem("userSession") || "null");
+      return (session && session.token) ? session.token : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleConnectDrive = async () => {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      setDriveError("You must be signed in.");
+      return;
+    }
+
+    const response = await fetch("/api/drive/oauth/start", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.authUrl) {
+      throw new Error(data.error || "Failed to start Drive connection.");
+    }
+
+    window.location.href = data.authUrl;
+  } catch (error) {
+    console.error("Connect Drive error:", error);
+    setDriveError(error.message || "Could not connect Drive.");
+  }
+};
+
+/**
+ * ensureDriveConnected — checks whether the user already has an active
+ * Drive integration. If not connected, it starts the OAuth flow.
+ * Returns true only when already connected in the current session.
+ */
+const ensureDriveConnected = async () => {
+  const token = await getAuthToken();
+  if (!token) {
+    setDriveError("You must be signed in.");
+    return false;
+  }
+
+  const response = await fetch("/api/drive/status", {
+    method: "GET",
+    headers: { Authorization: "Bearer " + token }
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Could not check Drive status.");
+  }
+
+  if (!data.connected) {
+    showAlert("Please connect Google Drive to continue.");
+    await handleConnectDrive();
+    return false;
+  }
+
+  return true;
+};
+
+/**
+ * handleOpenDriveBrowser — opens the Drive browser only when the user is
+ * already connected. If not connected, it triggers OAuth first.
+ */
+const handleOpenDriveBrowser = async () => {
+  try {
+    setDriveError(null);
+    const connected = await ensureDriveConnected();
+    if (!connected) return;
+    setDriveOpen(true);
+  } catch (error) {
+    console.error("Open Drive browser error:", error);
+    setDriveError(error.message || "Could not open Drive browser.");
+  }
+};
+
+/**
+ * handleImportFromDrive — called by DriveBrowser when the user clicks
+ * "Import" on a file. Sends the fileId to the backend, which fetches
+ * the file text from Drive and creates a new Firestore content document.
+ */
+const handleImportFromDrive = async (fileId) => {
+  const token = await getAuthToken();
+  if (!token) throw new Error("You must be signed in.");
+
+  const response = await fetch("/api/drive/import-content", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    },
+    body: JSON.stringify({ fileId })
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Import failed.");
+
+  setDriveOpen(false);
+  await fetchContent(user);
+  showAlert("Imported from Drive: " + (data.title || "Untitled"));
+};
+
+const handleUploadContentToDrive = async (item) => {
+  try {
+    setDriveUploadingId(item.id);
+    setDriveError(null);
+
+    const connected = await ensureDriveConnected();
+    if (!connected) return;
+
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("You must be signed in.");
+    }
+
+    const response = await fetch("/api/drive/upload-content", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token
+      },
+      body: JSON.stringify({ contentId: item.id })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Upload failed.");
+    }
+
+    await fetchContent(user);
+    showAlert("Uploaded to Drive successfully.");
+  } catch (error) {
+    console.error("Upload to Drive error:", error);
+    setDriveError(error.message || "Could not upload content to Drive.");
+  } finally {
+    setDriveUploadingId(null);
+  }
+};
+
   if (!user && !loading) {
     return (
       <div className="dashboard">
@@ -360,7 +550,14 @@ const handleManualScheduleSubmit = async () => {
       </div>
     );
   }
-
+  const filteredContent = content.filter((item) => {
+    const title = (item.title || "").toLowerCase();
+    const text = (item.text || "").toLowerCase();
+    const query = search.toLowerCase();
+    return title.includes(query) || text.includes(query);
+  });
+  
+ 
   return (
     <div className="dashboard-main">
       <InPageAlert alertState={alertState} onClose={dismissAlert} />
@@ -376,6 +573,12 @@ const handleManualScheduleSubmit = async () => {
             <div className="dashboard-card-desc">Start a new post. Choose a template and write your content.</div>
             <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
               + Create Content
+            </button>
+            <button
+              className="dashboard-card-btn secondary drive-btn"
+              onClick={handleOpenDriveBrowser}
+            >
+              Import from Drive
             </button>
           </div>
         </div>
@@ -393,12 +596,35 @@ const handleManualScheduleSubmit = async () => {
           </div>
         </div>
       </div>
+      <div className="dashboard-toolbar">
+        <div className="dashboard-search-wrap">
+          <input type="text" className="dashboard-search-input" placeholder="Search content..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        <div className="dashboard-filter-wrap">
+          <span className="dashboard-filter-label">Stage</span>
+          <select className="dashboard-stage-select" value={selectedStage} onChange={(e) => setSelectedStage(e.target.value)}>
+            {STAGES.map((stage) => (
+              <option key={stage} value={stage}>{stage}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    
 
       {/* AMINAH: CreateContent modal */}
       <CreateContent
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => fetchContent(user)}
+      />
+
+      {/* Drive file browser — supports exploring My Drive, Shared Drives,
+          and sub-folders before choosing a file to import */}
+      <DriveBrowser
+        isOpen={driveOpen}
+        onClose={() => setDriveOpen(false)}
+        getToken={getAuthToken}
+        onImport={handleImportFromDrive}
       />
 
       {/* AMINAH: Templates Modal */}
@@ -409,16 +635,17 @@ const handleManualScheduleSubmit = async () => {
 
       {error && <div className="error-alert">{error}</div>}
       {scheduleError && <div className="error-alert">{scheduleError}</div>}
+      {driveError && <div className="error-alert">{driveError}</div>}
 
       {loading ? (
         <div className="loading">Loading your content...</div>
-      ) : content.length === 0 ? (
+      ) : filteredContent.length === 0 ? (
         <div className="empty-state">
           <p>No content yet. Create your first piece of content!</p>
         </div>
       ) : (
         <div className="dashboard-content-list">
-          {content.map((item) => (
+          {filteredContent.map((item) => (
             <div key={item.id} className="dashboard-content-card content-item-box">
               {/* AMINAH: Content item box container */}
               <div className="dashboard-content-header">
@@ -445,7 +672,15 @@ const handleManualScheduleSubmit = async () => {
                 <span className="content-item-stage">Stage: {item.stage}</span>
                 <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
-              <div className="dashboard-content-type">{item.type || item.template || item.category || item.name || "Company Announcement"}</div>
+              <div className="dashboard-content-type">{item.type || templateTitles[item.templateId] || item.category || item.name || "Company Announcement"}</div>
+              <button
+                className="dashboard-card-btn secondary-schedule-btn"
+                onClick={() => handleUploadContentToDrive(item)}
+                disabled={driveUploadingId === item.id}
+                style={{ marginTop: "8px", marginBottom: "8px" }}
+              >
+                {driveUploadingId === item.id ? "Uploading..." : "Upload to Drive"}
+              </button>
               
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}

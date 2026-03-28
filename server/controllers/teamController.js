@@ -249,3 +249,54 @@ exports.assignReviewerToContent = async (req, res) => {
     res.status(500).json({ error: error.message || "Failed to assign reviewer" });
   }
 };
+
+exports.removeMemberFromTeam = async (req, res) => {
+  console.log("POST /api/team/remove-member - START");
+
+  try {
+    const { adminId, memberId, teamId } = req.body;
+
+    if (!adminId || !memberId || !teamId) {
+      return res.status(400).json({ error: "adminId, memberId, and teamId are required" });
+    }
+
+    if (adminId === memberId) {
+      return res.status(400).json({ error: "Admins cannot remove themselves from the team" });
+    }
+
+    const adminDoc = await db.collection("Users").doc(adminId).get();
+    if (!adminDoc.exists) {
+      return res.status(404).json({ error: "Admin user not found" });
+    }
+
+    const adminData = adminDoc.data();
+    if (adminData.role !== "admin") {
+      return res.status(403).json({ error: "Only admins can remove team members" });
+    }
+
+    if (adminData.teamId !== teamId) {
+      return res.status(403).json({ error: "Admin does not have access to this team" });
+    }
+
+    const memberDoc = await db.collection("Users").doc(memberId).get();
+    if (!memberDoc.exists) {
+      return res.status(404).json({ error: "Member not found" });
+    }
+
+    const memberData = memberDoc.data();
+    if (memberData.teamId !== teamId) {
+      return res.status(403).json({ error: "Member does not belong to this team" });
+    }
+
+    await db.collection("Users").doc(memberId).update({
+      teamId: admin.firestore.FieldValue.delete(),
+      role: "user",
+    });
+
+    console.log("SUCCESS: Member removed from team");
+    res.json({ success: true, message: "Member removed from team successfully" });
+  } catch (error) {
+    console.error("ERROR in removeMemberFromTeam:", error);
+    res.status(500).json({ error: error.message || "Failed to remove member" });
+  }
+};
