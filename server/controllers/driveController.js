@@ -146,7 +146,10 @@ exports.startOAuth = async (req, res) => {
     return res.json({ authUrl: url });
   } catch (error) {
     console.error("startOAuth error:", error.message);
-    return res.status(500).json({ error: "Failed to start OAuth flow" });
+    return res.status(500).json({
+      error: "Failed to start OAuth flow",
+      ...(process.env.NODE_ENV === "production" ? {} : { detail: error.message })
+    });
   }
 };
 

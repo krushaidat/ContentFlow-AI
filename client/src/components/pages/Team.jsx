@@ -321,7 +321,7 @@ export default function Team() {
                           {m.uid !== user?.uid && (
                             <button
                               className="team-btn-remove"
-                              disable={saving}
+                              disabled={saving}
                               onClick={() => handleRemoveMember(m.uid)}
                               title="Remove member"
                             >

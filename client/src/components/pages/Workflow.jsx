@@ -29,7 +29,7 @@ import {
 import InPageAlert from "../InPageAlert";
 import "../styles/workflow.css";
 
-const API_BASE = "http://localhost:5050/api";
+const API_BASE = "http://localhost:5000/api";
 
 const STAGES = [
   "Draft",

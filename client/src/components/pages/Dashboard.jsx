@@ -76,7 +76,7 @@ const handleManualScheduleSubmit = async () => {
 
     // Abdalaa: manual scheduling should allow any date/time,
     // and it can also repeat daily, weekly, or monthly.
-    const response = await fetch("http://localhost:5050/api/ai/manual-schedule", {
+    const response = await fetch("http://localhost:5000/api/ai/manual-schedule", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -315,7 +315,7 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
   
       // Abdalaa: AI scheduling should search for the best free slot
       // inside the selected future window.
-      const response = await fetch("http://localhost:5050/api/ai/suggest-post-time", {
+      const response = await fetch("http://localhost:5000/api/ai/suggest-post-time", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -415,7 +415,8 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
 
     const data = await response.json();
     if (!response.ok || !data.authUrl) {
-      throw new Error(data.error || "Failed to start Drive connection.");
+      const detail = data.detail ? ` (${data.detail})` : "";
+      throw new Error((data.error || "Failed to start Drive connection.") + detail);
     }
 
     window.location.href = data.authUrl;
