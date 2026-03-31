@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
@@ -566,15 +566,17 @@ const handleUploadContentToDrive = async (item) => {
           <div className="dashboard-card-body">
             <div className="dashboard-card-title">Create Content</div>
             <div className="dashboard-card-desc">Start a new post. Choose a template and write your content.</div>
-            <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
-              + Create Content
-            </button>
-            <button
-              className="dashboard-card-btn secondary drive-btn"
-              onClick={handleOpenDriveBrowser}
-            >
-              Import from Drive
-            </button>
+            <div className="dashboard-create-actions">
+              <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
+                + Create Content
+              </button>
+              <button
+                className="dashboard-card-btn secondary drive-btn"
+                onClick={handleOpenDriveBrowser}
+              >
+                Import from Drive
+              </button>
+            </div>
           </div>
         </div>
         <div className="dashboard-card templates-card">
@@ -648,6 +650,21 @@ const handleUploadContentToDrive = async (item) => {
                 {/*- Moved edit and delete buttons from `.dashboard-content-actions` at the bottom to `.dashboard-content-header` at the top
                   - Buttons now positioned at top-right of each card*/}
                 <div className="dashboard-content-actions">
+                  <button
+                    className="icon-btn upload"
+                    onClick={() => handleUploadContentToDrive(item)}
+                    title="Upload to Drive"
+                    disabled={driveUploadingId === item.id}
+                  >
+                    {driveUploadingId === item.id ? (
+                      <svg className="icon-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="9" strokeOpacity="0.25" />
+                        <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M 0 16 L 0 24 L 24 24 L 24 16 L 22 16 L 22 22 L 2 22 L 2 16 L 0 16 L 0 16 M 8 19 L 16 19 L 16 14 L 16 12 L 20 12 L 12 2 L 12 2 L 4 12 L 8 12 L 8 19 Z"/></svg>
+                    )}
+                  </button>
                   <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">
                     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
@@ -668,14 +685,6 @@ const handleUploadContentToDrive = async (item) => {
                 <span className="content-item-date">{item.createdAt ? formatDate(item.createdAt) : "Invalid Date"}</span>
               </div>
               <div className="dashboard-content-type">{item.type || templateTitles[item.templateId] || item.category || item.name || "Company Announcement"}</div>
-              <button
-                className="dashboard-card-btn secondary-schedule-btn"
-                onClick={() => handleUploadContentToDrive(item)}
-                disabled={driveUploadingId === item.id}
-                style={{ marginTop: "8px", marginBottom: "8px" }}
-              >
-                {driveUploadingId === item.id ? "Uploading..." : "Upload to Drive"}
-              </button>
               
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}
