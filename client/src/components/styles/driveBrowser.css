@@ -1,207 +1,351 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   DriveBrowser styles
-   These classes are scoped to the Drive file-explorer modal.
-   Structural styles (.modal-overlay, .modal-header, .modal-body, .modal-close,
-   .loading, .empty-state, .error-alert) are inherited from dashboard.css.
-───────────────────────────────────────────────────────────────────────────── */
+/* DriveBrowser layout and visual polish */
 
-/* Wider modal so the file list has room to breathe */
+.modal-content.db-modal,
 .db-modal {
-  max-width: 760px;
-  width: 95%;
+  width: min(98vw, 1360px);
+  max-width: 1360px;
+  height: min(88vh, 860px);
+  min-height: 620px;
+  border-radius: 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 85vh;
 }
 
-/* ── Drive selector tabs ──────────────────────────────────────────────────── */
+.db-modal--split {
+  width: min(98vw, 1360px);
+  max-width: 1360px;
+}
 
-/* Horizontal scrollable row of pill-shaped drive tabs */
 .db-drive-bar {
   display: flex;
-  gap: 6px;
-  padding: 10px 20px;
-  border-bottom: 1px solid #e5e7eb;
-  overflow-x: auto;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebe8f3;
+  overflow: visible;
+  background: linear-gradient(180deg, #fcfbff 0%, #f7f5ff 100%);
 }
 
 .db-drive-tab {
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 20px;
-  padding: 6px 14px;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 1;
+  min-height: 36px;
+  line-height: 1.15;
+  background: #fff;
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  padding: 8px 14px;
   font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  color: #374151;
+  font-weight: 600;
+  color: #4c1d95;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .db-drive-tab:hover {
-  background: #ede9fe;
-  border-color: #c4b5fd;
-  color: #7c3aed;
+  background: #f4f1ff;
+  box-shadow: 0 3px 10px rgba(76, 29, 149, 0.12);
+  transform: translateY(-1px);
 }
 
-/* Filled purple when the drive is currently selected */
 .db-drive-tab.active {
   background: #7c3aed;
   border-color: #7c3aed;
   color: #fff;
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.28);
 }
 
-/* ── Breadcrumb ───────────────────────────────────────────────────────────── */
-
-/* Thin bar showing the path: My Drive / Folder A / Folder B */
 .db-breadcrumb {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 2px;
-  padding: 8px 20px;
-  border-bottom: 1px solid #f3f4f6;
-  background: #fafafa;
-  flex-shrink: 0;
+  gap: 3px;
+  padding: 10px 16px;
+  background: #faf9ff;
+  border-bottom: 1px solid #ebe8f3;
 }
 
 .db-crumb-group {
-  display: flex;
+  display: inline-flex;
   align-items: center;
 }
 
-/* Each clickable folder name in the breadcrumb */
 .db-crumb {
-  background: none;
   border: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: #7c3aed;
+  background: transparent;
+  color: #6d28d9;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 7px;
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  transition: background 0.15s;
 }
 
 .db-crumb:hover {
-  background: #ede9fe;
+  background: #efe9ff;
 }
 
-/* "/" separator between crumbs */
 .db-crumb-sep {
-  color: #9ca3af;
-  font-size: 13px;
-  margin: 0 2px;
-  user-select: none;
+  color: #a78bfa;
+  font-size: 12px;
 }
 
-/* ── File / folder list body ──────────────────────────────────────────────── */
-
-/* Scrollable area that holds all file rows */
-.db-body {
+.db-split-body {
+  display: grid;
+  grid-template-columns: minmax(360px, 40%) 1fr;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.db-body {
+  min-height: 0;
   overflow-y: auto;
-  padding: 12px 20px;
-  scrollbar-width: thin;
-  scrollbar-color: #7c3aed #ffffff;
+  scrollbar-gutter: stable;
 }
 
-.db-body::-webkit-scrollbar {
-  width: 10px;
-}
-
-.db-body::-webkit-scrollbar-track {
-  background: #ffffff;
-}
-
-.db-body::-webkit-scrollbar-thumb {
-  background: #7c3aed;
-  border: 1px solid #6d28d9;
-  border-radius: 999px;
-}
-
-.db-body::-webkit-scrollbar-thumb:hover {
-  background: #6d28d9;
+.db-body--left {
+  border-right: 1px solid #ebe8f3;
+  padding: 14px;
 }
 
 .db-item-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
 }
 
-/* Single file/folder row */
 .db-item-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 9px 10px;
-  border-radius: 6px;
-  transition: background 0.1s;
+  padding: 12px;
+  border: 1px solid #ede9fe;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .db-item-row:hover {
-  background: #f5f3ff;
+  border-color: #c4b5fd;
+  background: #faf7ff;
+  box-shadow: 0 4px 14px rgba(109, 40, 217, 0.08);
 }
 
-/* Emoji icon — fixed width so names stay aligned */
+.db-item-row--selected {
+  border-color: #8b5cf6;
+  background: #f3edff;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.14);
+}
+
 .db-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  width: 26px;
+  width: 24px;
   text-align: center;
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
-/* Name + meta text column */
 .db-item-info {
-  flex: 1;
-  min-width: 0; /* allows text-overflow to work inside a flex child */
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 4px;
 }
 
 .db-item-name {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-item-row--selected .db-item-name {
+  color: #4c1d95;
+}
+
+.db-item-meta {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-folder-chevron {
+  color: #8b5cf6;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.db-load-more {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid #d1c8fa;
+  border-radius: 10px;
+  background: #f8f5ff;
+  color: #5b21b6;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.db-load-more:hover {
+  background: #efe7ff;
+}
+
+.db-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.db-preview-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fff;
+}
+
+.db-preview-empty {
+  align-items: center;
+  justify-content: center;
+}
+
+.db-preview-placeholder {
+  text-align: center;
+  color: #6b7280;
+  padding: 40px 28px;
+}
+
+.db-preview-placeholder-icon {
+  display: block;
+  font-size: 30px;
+  margin-bottom: 10px;
+}
+
+.db-preview-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #ebe8f3;
+  background: #fcfbff;
+}
+
+.db-preview-header .db-icon {
+  font-size: 20px;
+}
+
+.db-preview-header-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.db-preview-filename {
+  font-size: 15px;
+  font-weight: 800;
   color: #111827;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* MIME type + modified date shown in muted text under the name */
-.db-item-meta {
+.db-preview-meta {
   font-size: 12px;
-  color: #9ca3af;
-  margin-top: 1px;
+  color: #6b7280;
 }
 
-/* ── Row action buttons (Open / Import) ───────────────────────────────────── */
+.db-preview-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 16px;
+}
+
+.db-preview-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.db-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #7c3aed;
+  animation: db-spin 0.7s linear infinite;
+}
+
+@keyframes db-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.db-preview-unavailable {
+  color: #374151;
+  font-size: 14px;
+}
+
+.db-preview-unavailable-sub {
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.db-preview-text {
+  margin: 0;
+  border: 1px solid #ece7f8;
+  border-radius: 12px;
+  background: #fcfbff;
+  padding: 14px;
+  font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.db-preview-truncation-note {
+  margin-top: 10px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.db-preview-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 16px;
+  border-top: 1px solid #ebe8f3;
+  background: #fcfbff;
+}
 
 .db-action-btn {
   border: none;
-  border-radius: 5px;
-  padding: 5px 14px;
+  border-radius: 10px;
+  padding: 10px 14px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: background 0.15s;
 }
 
-/* "Open" — neutral grey, navigates into a folder */
-.db-open-btn {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.db-open-btn:hover {
-  background: #e5e7eb;
-}
-
-/* "Import" — brand purple, triggers the actual import */
 .db-import-btn {
   background: #7c3aed;
   color: #fff;
@@ -216,42 +360,29 @@
   cursor: not-allowed;
 }
 
-/* ── Pagination ───────────────────────────────────────────────────────────── */
-
-/* Full-width "Load more" button at the bottom of the list */
-.db-load-more {
-  display: block;
-  width: 100%;
-  margin-top: 12px;
-  padding: 9px;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #374151;
-  cursor: pointer;
-  transition: background 0.15s;
+@media (max-width: 980px) {
+  .db-split-body {
+    grid-template-columns: minmax(300px, 44%) 1fr;
+  }
 }
 
-.db-load-more:hover {
-  background: #e5e7eb;
-}
-
-.db-load-more:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* ── Responsive ───────────────────────────────────────────────────────────── */
-
-@media (max-width: 600px) {
-  .db-modal {
-    width: 100%;
-    max-height: 100vh;
+@media (max-width: 760px) {
+  .db-modal,
+  .db-modal--split {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    min-height: 0;
     border-radius: 0;
   }
 
-  .db-item-name {
-    font-size: 13px;
+  .db-split-body {
+    grid-template-columns: 1fr;
+  }
+
+  .db-body--left {
+    border-right: none;
+    border-bottom: 1px solid #ebe8f3;
+    max-height: 44vh;
   }
 }

@@ -19,6 +19,8 @@ router.get("/drives",          requireFirebaseAuth, driveController.listDrives);
 // Lists files and folders inside a given drive/folder (supports folderId, driveId, pagination)
 router.get("/files",           requireFirebaseAuth, driveController.listFiles);
 
+router.get("/preview",   requireFirebaseAuth, driveController.previewDriveFile);
+
 // Imports a Drive file into a new Firestore content document
 router.post("/import-content", requireFirebaseAuth, driveController.importDriveFileToContent);
 
