@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { google } = require("googleapis");
-const db = require("../config/firebase");
+const { db } = require("../config/firebase");
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -146,7 +146,10 @@ exports.startOAuth = async (req, res) => {
     return res.json({ authUrl: url });
   } catch (error) {
     console.error("startOAuth error:", error.message);
-    return res.status(500).json({ error: "Failed to start OAuth flow" });
+    return res.status(500).json({
+      error: "Failed to start OAuth flow",
+      ...(process.env.NODE_ENV === "production" ? {} : { detail: error.message })
+    });
   }
 };
 
@@ -519,5 +522,69 @@ exports.disconnectDrive = async (req, res) => {
   } catch (error) {
     console.error("disconnectDrive error:", error.message);
     return res.status(500).json({ error: "Failed to disconnect Drive" });
+  }
+};
+
+  /**
+ * previewDriveFile — returns a truncated text preview of a Drive file
+ * without creating a Firestore content document.
+ *
+ * Query params:
+ *   fileId — the Drive file ID to preview
+ */
+exports.previewDriveFile = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const fileId = req.query.fileId;
+
+    if (!fileId) {
+      return res.status(400).json({ error: "fileId is required" });
+    }
+
+    const { driveApi } = await getDriveForUser(uid);
+
+    const metaResp = await driveApi.files.get({
+      fileId,
+      fields: "id, name, mimeType, modifiedTime, size",
+      supportsAllDrives: true
+    });
+
+    const meta = metaResp.data || {};
+    const PREVIEW_CHAR_LIMIT = 3000;
+    let previewText = "";
+
+    if (meta.mimeType === "application/vnd.google-apps.document") {
+      const exportResp = await driveApi.files.export(
+        { fileId, mimeType: "text/plain" },
+        { responseType: "arraybuffer" }
+      );
+      const full = Buffer.from(exportResp.data).toString("utf8");
+      previewText = full.slice(0, PREVIEW_CHAR_LIMIT);
+    } else if (meta.mimeType && meta.mimeType.startsWith("text/")) {
+      const mediaResp = await driveApi.files.get(
+        { fileId, alt: "media", supportsAllDrives: true },
+        { responseType: "arraybuffer" }
+      );
+      const full = Buffer.from(mediaResp.data).toString("utf8");
+      previewText = full.slice(0, PREVIEW_CHAR_LIMIT);
+    } else {
+      previewText = null; // non-text file — preview not available
+    }
+
+    return res.json({
+      id: meta.id,
+      name: meta.name,
+      mimeType: meta.mimeType,
+      modifiedTime: meta.modifiedTime,
+      size: meta.size || null,
+      preview: previewText,
+      truncated: previewText !== null && previewText.length === PREVIEW_CHAR_LIMIT
+    });
+  } catch (error) {
+    if (error.code === "DRIVE_NOT_CONNECTED") {
+      return res.status(400).json({ error: "Google Drive is not connected" });
+    }
+    console.error("previewDriveFile error:", error.message);
+    return res.status(500).json({ error: "Failed to preview file" });
   }
 };

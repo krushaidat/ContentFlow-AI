@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "test": "jest --verbose --forceExit --detectOpenHandles",
     "dev": "nodemon index.js"
   },
   "keywords": [],
@@ -11,14 +12,17 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@google/genai": "^1.44.0",
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@google/genai": "^1.46.0",
     "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "firebase-admin": "^13.6.1"
+    "firebase-admin": "^13.6.1",
+    "googleapis": "^171.4.0"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.1.11"
   }
 }

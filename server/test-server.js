@@ -8,7 +8,7 @@ try {
   console.log("✓ Express loaded");
   
   console.log("Requiring firebase config...");
-  const db = require("./config/firebase");
+  const { db } = require("./config/firebase");
   console.log("✓ Firebase config loaded");
   
   console.log("Creating app...");
