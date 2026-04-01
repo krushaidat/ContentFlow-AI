@@ -220,6 +220,23 @@
   flex-direction: column;
 }
 
+.dashboard-create-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.dashboard-create-actions .dashboard-card-btn {
+  width: auto;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .dashboard-create-actions {
+    flex-direction: column;
+  }
+}
+
 .dashboard-card-icon {
   font-size: 32px;
   margin-bottom: 12px;
@@ -341,6 +358,19 @@
 .icon-btn svg {
   width: 18px;
   height: 18px;
+}
+
+.icon-spin {
+  animation: icon-spin 0.9s linear infinite;
+}
+
+@keyframes icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn-create {
