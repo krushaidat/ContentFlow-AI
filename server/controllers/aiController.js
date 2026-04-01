@@ -339,27 +339,56 @@ DRAFT SO FAR:
   }
 };
 
-// Abdalaa: build a realistic set of candidate slots for AI scheduling.
-// Gemini should choose from these free slots instead of inventing its own.
-function buildCandidateSlots(rangeDays = 3) {
-  const candidateTimes = ["09:00", "11:00", "14:00", "16:00", "18:00"];
+// Abdalaa: build candidate slots only during working hours.
+// Rules:
+// 1. only allow 9 AM to 5 PM
+// 2. for today, skip times that already passed
+// 3. if a day already has 3 scheduled posts, skip that day
+function buildCandidateSlots(rangeDays = 3, occupiedSlots = []) {
+  const candidateTimes = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
   const slots = [];
-  const today = new Date();
+  const now = new Date();
+
+  // Abdalaa: count how many posts are already scheduled on each date
+  const postsPerDay = {};
+
+  for (const slot of occupiedSlots) {
+    if (!slot.date) continue;
+    postsPerDay[slot.date] = (postsPerDay[slot.date] || 0) + 1;
+  }
 
   for (let i = 0; i < Number(rangeDays); i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
 
     const dateStr = d.toISOString().split("T")[0];
 
+    // Abdalaa: if this day already has 3 scheduled posts,
+    // skip the whole day and move to the next one.
+    if ((postsPerDay[dateStr] || 0) >= 3) {
+      continue;
+    }
+
     for (const time of candidateTimes) {
+      // Abdalaa: for today, do not allow past times
+      if (i === 0) {
+        const [hour, minute] = time.split(":").map(Number);
+        const slotDateTime = new Date(now);
+        slotDateTime.setHours(hour, minute, 0, 0);
+
+        if (slotDateTime <= now) {
+          continue;
+        }
+      }
+
       slots.push(`${dateStr} ${time}`);
     }
   }
 
   return slots;
-
 }
+
+
 // Abdalaa: remove already occupied slots so AI only sees real free options.
 function filterFreeSlots(candidateSlots, occupiedSlots) {
   const occupiedSet = new Set(
@@ -394,7 +423,7 @@ exports.suggestPostTime = async (req, res) => {
 
     const occupied = slotsSnapshot.docs.map((d) => d.data());
 
-    const candidateSlots = buildCandidateSlots(rangeDays);
+    const candidateSlots = buildCandidateSlots(rangeDays, occupied);
     const freeSlots = filterFreeSlots(candidateSlots, occupied);
 
     if (freeSlots.length === 0) {
