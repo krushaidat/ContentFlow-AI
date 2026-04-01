@@ -301,8 +301,8 @@ const Workflow = () => {
 
         showAlert(
           assignedReviewerId
-            ? "✅ Content passed! Moved to Review stage with reviewer assigned."
-            : "✅ Content passed! Moved to Review stage.",
+            ? "Content passed! Moved to Review stage with reviewer assigned."
+            : "Content passed! Moved to Review stage.",
           "success"
         );
       } else {
@@ -771,11 +771,11 @@ const Workflow = () => {
                     <div className="review-status">
                       {validationResult.compliance ? (
                         <span className="status-badge valid">
-                          ✓ Content Valid — Meets Guidelines
+                          Content Valid — Meets Guidelines
                         </span>
                       ) : (
                         <span className="status-badge invalid">
-                          ⚠ Needs Fixes — Does Not Meet Guidelines
+                          Needs Fixes — Does Not Meet Guidelines
                         </span>
                       )}
                     </div>

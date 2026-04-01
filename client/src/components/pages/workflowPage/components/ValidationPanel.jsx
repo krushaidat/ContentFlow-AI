@@ -116,11 +116,11 @@ const ValidationPanel = ({
             <div className="review-status">
               {validationResult.compliance ? (
                 <span className="status-badge valid">
-                  ✓ Content Valid — Meets Guidelines
+                  Content Valid — Meets Guidelines
                 </span>
               ) : (
                 <span className="status-badge invalid">
-                  ⚠ Needs Fixes — Does Not Meet Guidelines
+                  Needs Fixes — Does Not Meet Guidelines
                 </span>
               )}
             </div>

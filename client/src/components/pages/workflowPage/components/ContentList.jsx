@@ -74,11 +74,11 @@ const ContentList = ({
                     </span>
                     {item.validation.brandScore >= 90 ? (
                       <span className="wf-validation-status valid">
-                        ✓ Ready for Review
+                        Ready for Review
                       </span>
                     ) : (
                       <span className="wf-validation-status invalid">
-                        ⚠ Needs Fixes
+                        Needs Fixes
                       </span>
                     )}
                   </div>
