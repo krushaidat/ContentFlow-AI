@@ -230,6 +230,9 @@ const Workflow = () => {
       return;
     }
 
+    const selectedContentId = selectedContent.id;
+    const validatedAt = new Date().toISOString();
+
     if (!selectedTemplateId) {
       showAlert("Please select a template to validate against.", "warning");
       return;
@@ -244,7 +247,7 @@ const Workflow = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          postId: selectedContent.id,
+          postId: selectedContentId,
           templateId: selectedTemplateId,
         }),
       });
@@ -272,7 +275,7 @@ const Workflow = () => {
           stage: "Review",
           validation: data.validation,
           validatedTemplateId: selectedTemplateId,
-          validatedAt: new Date().toISOString(),
+          validatedAt,
         };
 
         if (assignedReviewerId) {
@@ -281,7 +284,7 @@ const Workflow = () => {
         }
 
         await updateDoc(
-          doc(db, "content", selectedContent.id),
+          doc(db, "content", selectedContentId),
           updatePayload
         );
         setSelectedContent((prev) =>
@@ -305,7 +308,7 @@ const Workflow = () => {
           // Update state with newly moved item
           setItems(reviewItems);
           if (reviewItems.length > 0) {
-            const movedItem = reviewItems.find((item) => item.id === selectedContent.id) || reviewItems[0];
+            const movedItem = reviewItems.find((item) => item.id === selectedContentId) || reviewItems[0];
             setSelectedContent(movedItem);
             setValidationResult(movedItem.validation || null);
             setShowValidationPanel(!!movedItem.validation);
@@ -326,11 +329,11 @@ const Workflow = () => {
       } else {
         // Validation complete but score < 80 — keep in Draft and store validation
         await updateDoc(
-          doc(db, "content", selectedContent.id),
+          doc(db, "content", selectedContentId),
           {
             validation: data.validation,
             validatedTemplateId: selectedTemplateId,
-            validatedAt: new Date().toISOString(),
+            validatedAt,
           }
         );
         setSelectedContent((prev) =>
@@ -339,19 +342,19 @@ const Workflow = () => {
                 ...prev,
                 validation: data.validation,
                 validatedTemplateId: selectedTemplateId,
-                validatedAt: new Date().toISOString(),
+                validatedAt,
               }
             : prev
         );
         //Sync the items list so badges reflect new score immediately
         setItems((prev) =>
           prev.map((item) =>
-            item.id === selectedContent.id
+            item.id === selectedContentId
               ? {
                   ...item,
                   validation: data.validation,
                   validatedTemplateId: selectedTemplateId,
-                  validatedAt: new Date().toISOString(),
+                  validatedAt,
                 }
               : item
           )
@@ -427,11 +430,14 @@ const Workflow = () => {
   // ---- Re-validate after fixes ----
   const revalidateAfterFixes = async () => {
     try {
+      const selectedContentId = selectedContent.id;
+      const validatedAt = new Date().toISOString();
+
       const res = await fetch(`${API_BASE}/ai/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          postId: selectedContent.id,
+          postId: selectedContentId,
           templateId: selectedTemplateId,
         }),
       });
@@ -441,10 +447,10 @@ const Workflow = () => {
       if (data.success) {
         setValidationResult(data.validation);
 
-        await updateDoc(doc(db, "content", selectedContent.id), {
+        await updateDoc(doc(db, "content", selectedContentId), {
           validation: data.validation,
           validatedTemplateId: selectedTemplateId,
-          validatedAt: new Date().toISOString(),
+          validatedAt,
         });
 
         setSelectedContent((prev) =>
@@ -453,7 +459,7 @@ const Workflow = () => {
                 ...prev,
                 validation: data.validation,
                 validatedTemplateId: selectedTemplateId,
-                validatedAt: new Date().toISOString(),
+                validatedAt,
               }
             : prev
         );
@@ -461,8 +467,13 @@ const Workflow = () => {
         //Sync the items list so badges update immediately without waiting for re-fetch
         setItems((prev) =>
           prev.map((item) =>
-            item.id === selectedContent.id
-              ? { ...item, validation: data.validation }
+            item.id === selectedContentId
+              ? {
+                  ...item,
+                  validation: data.validation,
+                  validatedTemplateId: selectedTemplateId,
+                  validatedAt,
+                }
               : item
           )
         );
