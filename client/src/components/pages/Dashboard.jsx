@@ -585,10 +585,10 @@ const handleUploadContentToDrive = async (item) => {
             <span role="img" aria-label="Templates" style={{fontSize: 32}}>📄</span>
           </div>
           <div className="dashboard-card-body">
-            <div className="dashboard-card-title">Templates</div>
-            <div className="dashboard-card-desc">Manage and modify templates to ensure brand consistency.</div>
+            <div className="dashboard-card-title">Guidelines</div>
+            <div className="dashboard-card-desc">Manage and modify guidelines to ensure brand consistency.</div>
             <button className="dashboard-card-btn secondary" onClick={handleManageTemplates}>
-              Manage Templates
+              Manage Guidelines
             </button>
           </div>
         </div>
@@ -689,42 +689,25 @@ const handleUploadContentToDrive = async (item) => {
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}
                 {item.stage === "Ready to Post" && (
-  <>
-    <div className="form-group" style={{ marginTop: "8px", marginBottom: "8px" }}>
-      <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>
-        AI Scheduling Window
-      </label>
-      <select
-        className="edit-select"
-        value={aiScheduleRangeDays}
-        onChange={(e) => setAiScheduleRangeDays(Number(e.target.value))}
-      >
-        <option value={1}>Next 1 day</option>
-        <option value={2}>Next 2 days</option>
-        <option value={3}>Next 3 days</option>
-        <option value={7}>Next 7 days</option>
-      </select>
-    </div>
-
+  <div className="schedule-actions-row">
     <button
-      className="dashboard-card-btn schedule-btn"
+      className="schedule-action-btn ai-schedule-btn"
       onClick={() => handleSuggestPostingTime(item)}
       disabled={schedulingPostId === item.id}
-      style={{ marginTop: "8px", marginBottom: "8px" }}
+      title="Let AI find the best posting time"
     >
-      {schedulingPostId === item.id
-        ? "Suggesting Time..."
-        : "Suggest Posting Time Using AI"}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6H8l4 6 4-6h-2c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><path d="M8 18h8"/><path d="M9 22h6"/></svg>
+      {schedulingPostId === item.id ? "Suggesting..." : "AI Schedule"}
     </button>
-
     <button
-      className="dashboard-card-btn secondary-schedule-btn"
+      className="schedule-action-btn manual-schedule-btn"
       onClick={() => handleOpenScheduleModal(item)}
-      style={{ marginTop: "0px", marginBottom: "8px" }}
+      title="Manually schedule this post"
     >
-      Schedule This Post
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Schedule
     </button>
-  </>
+  </div>
 )}
 
             </div>
@@ -799,11 +782,48 @@ const handleUploadContentToDrive = async (item) => {
   <div className="modal-overlay" onClick={handleCloseScheduleModal}>
     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
-        <h3>Schedule This Post</h3>
+        <h3>Schedule Post</h3>
         <button className="modal-close" onClick={handleCloseScheduleModal}>×</button>
       </div>
 
       <div className="modal-body">
+        {/* AI Scheduling Section */}
+        <div className="schedule-section">
+          <div className="schedule-section-label">AI Scheduling</div>
+          <div className="schedule-ai-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label htmlFor="ai-schedule-range">Search Window</label>
+              <select
+                id="ai-schedule-range"
+                className="edit-select"
+                value={aiScheduleRangeDays}
+                onChange={(e) => setAiScheduleRangeDays(Number(e.target.value))}
+              >
+                <option value={1}>Next 1 day</option>
+                <option value={2}>Next 2 days</option>
+                <option value={3}>Next 3 days</option>
+                <option value={7}>Next 7 days</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn-save schedule-ai-btn"
+              onClick={() => {
+                handleCloseScheduleModal();
+                handleSuggestPostingTime(selectedPostForSchedule);
+              }}
+              disabled={schedulingPostId === selectedPostForSchedule?.id}
+            >
+              {schedulingPostId === selectedPostForSchedule?.id ? "Finding..." : "Find Best Time"}
+            </button>
+          </div>
+        </div>
+
+        <div className="schedule-divider">
+          <span>or schedule manually</span>
+        </div>
+
+        {/* Manual Scheduling Section */}
       <div className="form-group">
   <label htmlFor="manual-schedule-date">Date</label>
   <input

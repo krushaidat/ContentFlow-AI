@@ -1,33 +1,30 @@
 const express = require("express");
+const requireFirebaseAuth = require("../middleware/requireFirebaseAuth");
+const {
+  startOAuth,
+  oauthCallback,
+  driveStatus,
+  listDrives,
+  listFiles,
+  importDriveFileToContent,
+  uploadContentToDrive,
+  disconnectDrive,
+  previewDriveFile,
+} = require("../controllers/driveController");
+
 const router = express.Router();
 
-const requireFirebaseAuth = require("../middleware/requireFirebaseAuth");
-const driveController = require("../controllers/driveController");
+// OAuth start requires an authenticated app user; callback comes from Google.
+router.get("/oauth/start", requireFirebaseAuth, startOAuth);
+router.get("/oauth/callback", oauthCallback);
 
-// Begin the Google OAuth 2.0 consent flow — returns a redirect URL to the client
-router.get("/oauth/start",     requireFirebaseAuth, driveController.startOAuth);
+router.get("/status", requireFirebaseAuth, driveStatus);
+router.get("/drives", requireFirebaseAuth, listDrives);
+router.get("/files", requireFirebaseAuth, listFiles);
+router.get("/preview", requireFirebaseAuth, previewDriveFile);
 
-// Google redirects back here after the user grants/denies Drive access
-router.get("/oauth/callback",  driveController.oauthCallback);
-
-// Returns whether the current user has an active Drive connection
-router.get("/status",          requireFirebaseAuth, driveController.driveStatus);
-
-// Returns the user's list of drives (My Drive + Shared Drives) for the browser tabs
-router.get("/drives",          requireFirebaseAuth, driveController.listDrives);
-
-// Lists files and folders inside a given drive/folder (supports folderId, driveId, pagination)
-router.get("/files",           requireFirebaseAuth, driveController.listFiles);
-
-router.get("/preview",   requireFirebaseAuth, driveController.previewDriveFile);
-
-// Imports a Drive file into a new Firestore content document
-router.post("/import-content", requireFirebaseAuth, driveController.importDriveFileToContent);
-
-// Uploads a Firestore content document to the user's Drive as a .txt file
-router.post("/upload-content", requireFirebaseAuth, driveController.uploadContentToDrive);
-
-// Clears the stored Drive refresh token, disconnecting the integration
-router.post("/disconnect",     requireFirebaseAuth, driveController.disconnectDrive);
+router.post("/import-content", requireFirebaseAuth, importDriveFileToContent);
+router.post("/upload-content", requireFirebaseAuth, uploadContentToDrive);
+router.post("/disconnect", requireFirebaseAuth, disconnectDrive);
 
 module.exports = router;

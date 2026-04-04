@@ -6,7 +6,7 @@
  * automatic fixes, and reviewer assignment.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   collection,
   getDocs,
@@ -37,6 +37,7 @@ import { useReviewers } from "./hooks/useReviewers";
 import ContentList from "./components/ContentList";
 import ValidationPanel from "./components/ValidationPanel";
 import ReviewerCard from "./components/ReviewerCard";
+import ContentViewModal from "./components/ContentViewModal";
 
 // Constants
 import { STAGES, API_BASE } from "./constants";
@@ -47,6 +48,9 @@ import "../../styles/workflow.css";
 const Workflow = () => {
   const { user } = useAuth();
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
+
+  // View modal state
+  const [viewContent, setViewContent] = useState(null);
 
   // Content management
   const {
@@ -197,8 +201,8 @@ const Workflow = () => {
 
       showAlert(
         assignedReviewerId
-          ? "✅ Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
-          : "✅ Content passed! Moved to Review stage.",
+          ? "Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
+          : "Content passed! Moved to Review stage.",
         "success",
       );
     } else if (validation) {
@@ -334,6 +338,7 @@ const Workflow = () => {
             error={error}
             selectedContent={selectedContent}
             onSelectContent={handleSelectContent}
+            onViewContent={(item) => setViewContent(item)}
             onStageChange={setSelectedStage}
             STAGES={STAGES}
           />
@@ -382,6 +387,14 @@ const Workflow = () => {
           AI validation powered by Gemini API
         </p>
       </div>
+
+      {/* Content View Modal */}
+      {viewContent && (
+        <ContentViewModal
+          content={viewContent}
+          onClose={() => setViewContent(null)}
+        />
+      )}
     </div>
   );
 };
