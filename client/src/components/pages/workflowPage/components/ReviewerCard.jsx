@@ -11,19 +11,10 @@ const ReviewerCard = ({
   selectedContent,
   currentReviewerName,
   availableReviewers,
-  selectedReviewer,
   assigningReviewer,
   reviewerError,
-  onSelectReviewer,
-  onAssignReviewer,
 }) => {
-  // Aminah Update: fixed reviewer assignment logic to prioritize selected reviewer, then suggested, then current
-  const effectiveReviewerId =
-    selectedReviewer ||
-    selectedContent?.suggestedReviewerId ||
-    selectedContent?.reviewerId;
-  const currentAssignmentId =
-    selectedContent?.reviewerId || selectedContent?.suggestedReviewerId;
+  const currentAssignmentId = selectedContent?.reviewerId;
 
   // Only show for Review stage and admin users
   if (selectedStage !== "Review" || userRole !== "admin" || !selectedContent) {
@@ -42,9 +33,7 @@ const ReviewerCard = ({
             <div className="reviewer-subtitle">Current Assignment</div>
             {currentAssignmentId ? (
               <div className="reviewer-assigned">
-                <span className="reviewer-badge">
-                  {selectedContent.reviewerId ? "✓ Assigned" : "◇ Auto Suggested"}
-                </span>
+                <span className="reviewer-badge">✓ Assigned</span>
                 <div className="reviewer-id-text">
                   {currentReviewerName} ({currentAssignmentId})
                 </div>
@@ -57,33 +46,17 @@ const ReviewerCard = ({
           </div>
 
           <div className="reviewer-section">
-            <label className="reviewer-label">Select Reviewer</label>
+            <label className="reviewer-label">Auto Assignment</label>
             {availableReviewers.length > 0 ? (
-              <>
-                <div className="select-wrap">
-                  <select
-                    className="select reviewer-select"
-                    value={selectedReviewer || ""}
-                    onChange={(e) => onSelectReviewer(e.target.value)}
-                  >
-                    <option value="">Choose a reviewer...</option>
-                    {availableReviewers.map((reviewer) => (
-                      <option key={reviewer.uid} value={reviewer.uid}>
-                        {reviewer.name || reviewer.email}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="select-caret">▾</span>
-                </div>
-
-                <button
-                  className="assign-reviewer-btn"
-                  onClick={onAssignReviewer}
-                  disabled={!effectiveReviewerId || assigningReviewer}
-                >
-                  {assigningReviewer ? "Assigning..." : "Assign Reviewer"}
-                </button>
-              </>
+              <div className="reviewer-empty">
+                {assigningReviewer ? (
+                  <p>Assigning reviewer automatically...</p>
+                ) : currentAssignmentId ? (
+                  <p>Reviewer assignment is automatic in Review stage.</p>
+                ) : (
+                  <p>Reviewer will be assigned automatically.</p>
+                )}
+              </div>
             ) : (
               <div className="reviewer-empty">
                 <p>No reviewers available in your team.</p>

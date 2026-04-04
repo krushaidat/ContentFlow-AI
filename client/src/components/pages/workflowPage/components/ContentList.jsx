@@ -15,6 +15,7 @@ const ContentList = ({
   onSelectContent,
   onStageChange,
   STAGES,
+  highlightedContentId,
 }) => {
   return (
     <section className="wf-card">
@@ -48,7 +49,7 @@ const ContentList = ({
             {items.map((item) => (
               <li
                 key={item.id}
-                className={`wf-item ${selectedContent?.id === item.id ? "active" : ""}`}
+                className={`wf-item ${selectedContent?.id === item.id ? "active" : ""} ${highlightedContentId === item.id ? "notification-highlight" : ""}`}
                 onClick={() => onSelectContent(item)}
               >
                 <div className="wf-item-top">

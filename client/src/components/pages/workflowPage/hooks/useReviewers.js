@@ -3,24 +3,20 @@
  * Handles reviewer assignment and management
  */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../../../../firebase";
 import { API_BASE } from "../constants";
-import {
-  getAvailableReviewers,
-  assignReviewerWithGemini,
-} from "../../../../utils/geminiReviewerAssignment";
+import { getAvailableReviewers } from "../../../../utils/geminiReviewerAssignment";
 import { collection, query, getDocs } from "firebase/firestore";
 
 export const useReviewers = () => {
   const [availableReviewers, setAvailableReviewers] = useState([]);
-  const [selectedReviewer, setSelectedReviewer] = useState(null);
   const [assigningReviewer, setAssigningReviewer] = useState(false);
   const [reviewerError, setReviewerError] = useState("");
   const [currentReviewerName, setCurrentReviewerName] = useState(null);
 
-  const fetchReviewers = async (user) => {
+  const fetchReviewers = useCallback(async (user) => {
     if (!user?.uid || user?.role !== "admin") {
       setAvailableReviewers([]);
       return;
@@ -38,27 +34,21 @@ export const useReviewers = () => {
       console.error("Error fetching reviewers:", err);
       setReviewerError("Failed to load reviewers");
     }
-  };
+  }, []);
 
-  const handleAssignReviewer = async (
+  const handleAssignReviewer = useCallback(async (
     user,
     selectedContent,
-    selectedReviewer,
+    reviewerId,
     showAlert
   ) => {
-    // Aminah Update: fixed reviewer assignment logic to prioritize selected reviewer, then suggested, then current
-    const effectiveReviewerId =
-      selectedReviewer ||
-      selectedContent?.suggestedReviewerId ||
-      selectedContent?.reviewerId;
-
     if (
-      !effectiveReviewerId ||
+      !reviewerId ||
       !selectedContent ||
       !user?.uid ||
       user?.role !== "admin"
     ) {
-      setReviewerError("Please select a reviewer");
+      setReviewerError("Unable to auto-assign reviewer");
       return;
     }
 
@@ -72,7 +62,7 @@ export const useReviewers = () => {
         body: JSON.stringify({
           adminId: user.uid,
           contentId: selectedContent.id,
-          reviewerId: effectiveReviewerId,
+          reviewerId,
           teamId: user.teamId,
         }),
       });
@@ -85,8 +75,6 @@ export const useReviewers = () => {
       const data = await response.json();
       showAlert(`Reviewer assigned: ${data.reviewerName}`, "success");
 
-      setSelectedReviewer(null);
-
       return data;
     } catch (err) {
       console.error("Error assigning reviewer:", err);
@@ -94,9 +82,9 @@ export const useReviewers = () => {
     } finally {
       setAssigningReviewer(false);
     }
-  };
+  }, []);
 
-  const fetchReviewerName = async (reviewerId) => {
+  const fetchReviewerName = useCallback(async (reviewerId) => {
     if (!reviewerId) {
       setCurrentReviewerName(null);
       return;
@@ -117,22 +105,15 @@ export const useReviewers = () => {
     } catch {
       setCurrentReviewerName("Unable to Load");
     }
-  };
-
-  const assignReviewerAuto = async (selectedContent, reviewers) => {
-    return await assignReviewerWithGemini(selectedContent, reviewers);
-  };
+  }, []);
 
   return {
     availableReviewers,
-    selectedReviewer,
-    setSelectedReviewer,
     assigningReviewer,
     reviewerError,
     currentReviewerName,
     fetchReviewers,
     handleAssignReviewer,
     fetchReviewerName,
-    assignReviewerAuto,
   };
 };

@@ -9,18 +9,17 @@
 }
 
 .calendar-header h1 {
-  font-size: 2rem;
-  font-weight: 800;
-  color: #111827;
-  margin-bottom: 0.3rem;
-  letter-spacing: -0.03em;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 0.25rem;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .calendar-subtitle {
-  color: #6b7280;
-  font-size: 1rem;
+  color: #666;
+  font-size: 0.9rem;
   margin-bottom: 0;
-  line-height: 1.6;
 }
 
 /* ============ TOP BAR ============ */
@@ -28,13 +27,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1.25rem;
-  margin-bottom: 1.25rem;
-  background: rgba(255, 255, 255, 0.88);
-  padding: 1rem 1.25rem;
-  border-radius: 18px;
-  box-shadow: 0 10px 28px rgba(124, 58, 237, 0.08);
-  border: 1px solid #ece7f8;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  background: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   flex-wrap: wrap;
 }
 
@@ -243,10 +241,9 @@
 
 /* ============ CALENDAR WRAPPER ============ */
 .calendar-wrapper {
-  background: #ffffff;
-  border-radius: 22px;
-  box-shadow: 0 16px 34px rgba(124, 58, 237, 0.08);
-  border: 1px solid #ece7f8;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
@@ -332,16 +329,16 @@
 }
 
 .event-badge {
-  padding: 0.45rem 0.65rem;
-  border-radius: 12px;
-  font-size: 0.78rem;
-  font-weight: 700;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
-  border-left: 4px solid;
+  transition: all 0.2s ease;
+  border-left: 3px solid;
 }
 
 .event-badge:hover {
@@ -349,9 +346,21 @@
   filter: brightness(0.95);
 }
 
-/* Abdalaa: I made the calendar events feel more clickable and polished. */
-.event-badge:hover {
-  box-shadow: 0 8px 18px rgba(124, 58, 237, 0.12);
+/* Notification Highlight */
+@keyframes event-orange-glow {
+  0% {
+    box-shadow: 0 0 0 2px #f97316;
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(249, 115, 22, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 2px #f97316;
+  }
+}
+
+.event-badge.notification-highlight-event {
+  animation: event-orange-glow 5s ease-in-out forwards;
 }
 
 .badge-idea {

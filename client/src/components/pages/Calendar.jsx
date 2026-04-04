@@ -1,18 +1,27 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import "../styles/calendar.css";
 import { getCalendarData } from "../../utils/calendarService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
-import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import {
+  doc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 
 // TA: Main Calendar component - manages calendar state and rendering with multiple view modes (month/week/day)
 const Calendar = () => {
-  const navigate = useNavigate();
+  const location = useLocation();
 // Abdalaa: I changed this so the calendar opens on today's real date
 // instead of being stuck on April 2024.
 const [currentDate, setCurrentDate] = useState(new Date());
+  const [highlightedEventId, setHighlightedEventId] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,6 +35,23 @@ const [currentDate, setCurrentDate] = useState(new Date());
 // Abdalaa: when I click a scheduled item in the calendar,
 // I want to store it here so I can edit or delete it.
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  // Handle notification highlight on arrival
+  useEffect(() => {
+    if (location.state?.highlightContentId) {
+      setHighlightedEventId(location.state.highlightContentId);
+      // Jump to event's date if it exists
+      const matchingEvent = events.find(e => e.postId === location.state.highlightContentId || e.id === location.state.highlightContentId);
+      if (matchingEvent && matchingEvent.suggestedDate) {
+        const [year, month, day] = matchingEvent.suggestedDate.split('-');
+        setCurrentDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
+      }
+      const timer = setTimeout(() => {
+        setHighlightedEventId(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state?.highlightContentId, events]);
 
   const [editSchedule, setEditSchedule] = useState({
   date: "",
@@ -216,6 +242,36 @@ const handleDeleteScheduledEvent = async () => {
 
     await deleteDoc(doc(db, "calendarSlots", selectedEvent.id));
 
+    // Remove matching AI suggestion so the same post does not instantly reappear as an idea.
+    if (auth.currentUser?.uid && selectedEvent.postId) {
+      const suggestionsRef = collection(db, "aiSuggestions");
+      const suggestionsQuery = query(
+        suggestionsRef,
+        where("userId", "==", auth.currentUser.uid),
+        where("postId", "==", selectedEvent.postId)
+      );
+      const suggestionsSnapshot = await getDocs(suggestionsQuery);
+
+      const deletions = [];
+      suggestionsSnapshot.forEach((docSnap) => {
+        const suggestion = docSnap.data();
+        const sameDate = (suggestion.suggestedDate || "") === (selectedEvent.suggestedDate || "");
+        const sameTime = (suggestion.suggestedTime || "") === (selectedEvent.suggestedTime || "");
+
+        if (sameDate && sameTime) {
+          deletions.push(deleteDoc(doc(db, "aiSuggestions", docSnap.id)));
+        }
+      });
+
+      if (deletions.length > 0) {
+        await Promise.all(deletions);
+      }
+    }
+
+    if (highlightedEventId === selectedEvent.id || highlightedEventId === selectedEvent.postId) {
+      setHighlightedEventId(null);
+    }
+
     const refreshed = await getCalendarData();
     setEvents(refreshed);
     handleCloseEventModal();
@@ -330,7 +386,7 @@ const handleDeleteScheduledEvent = async () => {
                             {getEventsForDate(day).map((event, idx) => (
                               <div
                                key={`${day}-${idx}`}
-                                className={`event-badge ${getBadgeColor(event.status)}`}
+                                className={`event-badge ${getBadgeColor(event.status)} ${highlightedEventId === event.id || highlightedEventId === event.postId ? 'notification-highlight-event' : ''}`}
                                title={event.title}
                                onClick={() => handleOpenEventModal(event)}
                                 >
@@ -370,7 +426,7 @@ const handleDeleteScheduledEvent = async () => {
   .map((event) => (
                           <div
                           key={event.id}
-                          className={`event-badge ${getBadgeColor(event.status)}`}
+                          className={`event-badge ${getBadgeColor(event.status)} ${highlightedEventId === event.id || highlightedEventId === event.postId ? 'notification-highlight-event' : ''}`}
                           title={event.title}
                           onClick={() => handleOpenEventModal(event)}
                         >
@@ -399,7 +455,7 @@ const handleDeleteScheduledEvent = async () => {
   )
   .map((event) => (                    <div
                       key={event.id}
-                      className={`event-badge ${getBadgeColor(event.status)}`}
+                      className={`event-badge ${getBadgeColor(event.status)} ${highlightedEventId === event.id || highlightedEventId === event.postId ? 'notification-highlight-event' : ''}`}
                       title={event.title}
                       onClick={() => handleOpenEventModal(event)}
 >                          <div className="event-time">{event.suggestedTime || "All day"}</div>

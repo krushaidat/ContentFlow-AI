@@ -5,6 +5,7 @@
 
 const { db } = require("../config/firebase");
 const { GoogleGenerativeAI, SchemaType } = require("@google/generative-ai");
+const { createNotification } = require("../utils/notificationService");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -487,6 +488,21 @@ ${freeSlotsText}
       });
     }
 
+    await createNotification({
+      recipientId: userId,
+      type: "content_scheduled",
+      title: "Post Scheduled",
+      message: `\"${post.title || "Untitled"}\" is scheduled for ${result.suggestedDate} at ${result.suggestedTime}.`,
+      contentId: postId,
+      eventKey: `content_scheduled_${postId}_${result.suggestedDate}_${result.suggestedTime}`,
+      metadata: {
+        source: usedFallback ? "fallback" : "gemini",
+        suggestedDate: result.suggestedDate,
+        suggestedTime: result.suggestedTime,
+        rangeDays: Number(rangeDays),
+      },
+    });
+
     return res.json({
       success: true,
       ...result,
@@ -540,6 +556,22 @@ exports.manualSchedulePost = async (req, res) => {
       createdAt: new Date(),
       repeatType,
       repeatCount: Number(repeatCount),
+    });
+
+    await createNotification({
+      recipientId: userId,
+      type: "content_scheduled",
+      title: "Post Scheduled",
+      message: `\"${postTitle}\" is scheduled for ${date} at ${time}.`,
+      contentId: postId,
+      eventKey: `content_scheduled_${postId}_${date}_${time}`,
+      metadata: {
+        source: "manual",
+        scheduledDate: date,
+        scheduledTime: time,
+        repeatType,
+        repeatCount: Number(repeatCount),
+      },
     });
 
     // Abdalaa: if repeat is enabled, create extra future slots too.

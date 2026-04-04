@@ -1,5 +1,6 @@
 const { db } = require("../config/firebase");
 const admin = require("firebase-admin");
+const { createNotification, buildDisplayName } = require("../utils/notificationService");
 
 /**
  * addMemberToTeam - Server-side team member addition
@@ -228,6 +229,8 @@ exports.assignReviewerToContent = async (req, res) => {
       return res.status(404).json({ error: "Content not found" });
     }
 
+    const contentData = contentDoc.data() || {};
+
     // Assign reviewer to content
     console.log("Assigning reviewer to content");
     await db.collection("content").doc(contentId).update({
@@ -235,6 +238,26 @@ exports.assignReviewerToContent = async (req, res) => {
       assignedAt: new Date().toISOString(),
       assignedBy: adminId,
     });
+
+    if (reviewerId) {
+      const adminName = buildDisplayName(adminData);
+      const contentTitle = contentData.title || "Untitled";
+
+      await createNotification({
+        recipientId: reviewerId,
+        type: "reviewer_assigned",
+        title: "New Review Assignment",
+        message: `${adminName} assigned you to review \"${contentTitle}\".`,
+        contentId,
+        actorId: adminId,
+        eventKey: `reviewer_assigned_${contentId}_${reviewerId}`,
+        metadata: {
+          contentTitle,
+          assignedBy: adminId,
+          teamId,
+        },
+      });
+    }
 
     console.log("SUCCESS: Reviewer assigned to content");
     res.json({
@@ -247,6 +270,221 @@ exports.assignReviewerToContent = async (req, res) => {
   } catch (error) {
     console.error("ERROR in assignReviewerToContent:", error);
     res.status(500).json({ error: error.message || "Failed to assign reviewer" });
+  }
+};
+
+/**
+ * submitReviewDecision - Server-side review approve/reject handler
+ * Updates content stage and sends notification to the author.
+ */
+exports.submitReviewDecision = async (req, res) => {
+  console.log("POST /api/team/review-decision - START");
+
+  try {
+    const { reviewerId, contentId, decision, rejectionReason } = req.body;
+
+    if (!reviewerId || !contentId || !decision) {
+      return res.status(400).json({ error: "reviewerId, contentId, and decision are required" });
+    }
+
+    if (!["approved", "rejected"].includes(decision)) {
+      return res.status(400).json({ error: "decision must be 'approved' or 'rejected'" });
+    }
+
+    if (decision === "rejected" && !String(rejectionReason || "").trim()) {
+      return res.status(400).json({ error: "rejectionReason is required when decision is rejected" });
+    }
+
+    const reviewerDoc = await db.collection("Users").doc(reviewerId).get();
+    if (!reviewerDoc.exists) {
+      return res.status(404).json({ error: "Reviewer not found" });
+    }
+
+    const reviewerData = reviewerDoc.data() || {};
+    if (reviewerData.role !== "reviewer") {
+      return res.status(403).json({ error: "Only reviewers can submit review decisions" });
+    }
+
+    const contentRef = db.collection("content").doc(contentId);
+    const contentDoc = await contentRef.get();
+
+    if (!contentDoc.exists) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    const contentData = contentDoc.data() || {};
+    if (contentData.reviewerId !== reviewerId) {
+      return res.status(403).json({ error: "You are not assigned to review this content" });
+    }
+
+    const updatePayload = {
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: reviewerId,
+      reviewStatus: decision,
+    };
+
+    // Aminah updated: build a snapshot of the content before the review decision is applied so it can be stored in versionHistory for the author to view later.
+    const previousSnapshot = {
+      title: contentData.title || "",
+      text: contentData.text || "",
+      stage: contentData.stage || "Draft",
+      snapshotAt: new Date().toISOString(),
+      snapshotBy: reviewerId,
+      changeType: decision === "approved" ? "review_approved" : "review_rejected",
+      reason: decision === "rejected"
+        ? String(rejectionReason || "").trim()
+        : "Approved by reviewer",
+    };
+
+    if (decision === "approved") {
+      updatePayload.stage = "Ready-To-Post";
+      updatePayload.rejectionReason = admin.firestore.FieldValue.delete();
+    } else {
+      updatePayload.stage = "Update";
+      updatePayload.rejectionReason = String(rejectionReason || "").trim();
+    }
+
+    // Aminah updated: atomically append the snapshot to the versionHistory array alongside the review decision update.
+    await contentRef.update({
+      ...updatePayload,
+      versionHistory: admin.firestore.FieldValue.arrayUnion(previousSnapshot),
+    });
+
+    const creatorId = contentData.createdBy;
+    if (creatorId) {
+      const reviewerName = buildDisplayName(reviewerData);
+      const contentTitle = contentData.title || "Untitled";
+
+      if (decision === "approved") {
+        await createNotification({
+          recipientId: creatorId,
+          type: "ready_to_post",
+          title: "Content Approved",
+          message: `${reviewerName} approved \"${contentTitle}\". It's now ready to post.`,
+          contentId,
+          actorId: reviewerId,
+          eventKey: `ready_to_post_${contentId}_${reviewerId}`,
+          metadata: {
+            contentTitle,
+            reviewStatus: decision,
+          },
+        });
+      } else {
+        await createNotification({
+          recipientId: creatorId,
+          type: "content_rejected",
+          title: "Changes Requested",
+          message: `${reviewerName} requested updates for \"${contentTitle}\".`,
+          contentId,
+          actorId: reviewerId,
+          eventKey: `content_rejected_${contentId}_${reviewerId}`,
+          metadata: {
+            contentTitle,
+            reviewStatus: decision,
+            rejectionReason: String(rejectionReason || "").trim(),
+          },
+        });
+      }
+    }
+
+    return res.json({ success: true, contentId, decision, ...updatePayload });
+  } catch (error) {
+    console.error("ERROR in submitReviewDecision:", error);
+    return res.status(500).json({ error: error.message || "Failed to submit review decision" });
+  }
+};
+
+/**
+ * submitAuthorContentUpdate - Server-side author update handler
+ * Updates content and notifies reviewer when previously rejected content is updated.
+ */
+exports.submitAuthorContentUpdate = async (req, res) => {
+  console.log("POST /api/team/content-update - START");
+
+  try {
+    const { authorId, contentId, title, text, stage } = req.body;
+
+    if (!authorId || !contentId) {
+      return res.status(400).json({ error: "authorId and contentId are required" });
+    }
+
+    const contentRef = db.collection("content").doc(contentId);
+    const contentDoc = await contentRef.get();
+    if (!contentDoc.exists) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    const contentData = contentDoc.data() || {};
+    if (contentData.createdBy !== authorId) {
+      return res.status(403).json({ error: "You can only update your own content" });
+    }
+
+    const updatePayload = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (typeof title === "string") updatePayload.title = title;
+    if (typeof text === "string") updatePayload.text = text;
+    if (typeof stage === "string" && stage.trim()) updatePayload.stage = stage;
+
+    const nextTitle = typeof title === "string" ? title : contentData.title || "";
+    const nextText = typeof text === "string" ? text : contentData.text || "";
+    const nextStage = typeof stage === "string" && stage.trim() ? stage : contentData.stage || "Draft";
+
+    const hasChanged =
+      nextTitle !== (contentData.title || "") ||
+      nextText !== (contentData.text || "") ||
+      nextStage !== (contentData.stage || "Draft");
+
+    // Aminah updated: only snapshot the previous content into versionHistory when something actually changed, to avoid storing meaningless no-op entries.
+    if (hasChanged) {
+      updatePayload.versionHistory = admin.firestore.FieldValue.arrayUnion({
+        title: contentData.title || "",
+        text: contentData.text || "",
+        stage: contentData.stage || "Draft",
+        snapshotAt: new Date().toISOString(),
+        snapshotBy: authorId,
+        changeType: "manual_edit",
+        reason: "Edited from dashboard",
+      });
+    }
+
+    await contentRef.update(updatePayload);
+
+    const wasRejected =
+      String(contentData.reviewStatus || "").toLowerCase() === "rejected" ||
+      String(contentData.stage || "").toLowerCase() === "update" ||
+      Boolean(contentData.rejectionReason);
+
+    const reviewerId = contentData.reviewerId;
+    if (wasRejected && reviewerId) {
+      const authorDoc = await db.collection("Users").doc(authorId).get();
+      const authorData = authorDoc.exists ? authorDoc.data() || {} : {};
+      const authorName = buildDisplayName(authorData);
+      const contentTitle = (typeof title === "string" && title.trim())
+        ? title.trim()
+        : contentData.title || "Untitled";
+
+      await createNotification({
+        recipientId: reviewerId,
+        type: "content_updated",
+        title: "Content Updated",
+        message: `${authorName} updated \"${contentTitle}\" after your feedback.`,
+        contentId,
+        actorId: authorId,
+        eventKey: `content_updated_${contentId}_${Date.now()}`,
+        metadata: {
+          contentTitle,
+          previousStage: contentData.stage || null,
+          newStage: updatePayload.stage || contentData.stage || null,
+        },
+      });
+    }
+
+    return res.json({ success: true, contentId, ...updatePayload });
+  } catch (error) {
+    console.error("ERROR in submitAuthorContentUpdate:", error);
+    return res.status(500).json({ error: error.message || "Failed to update content" });
   }
 };
 
