@@ -160,6 +160,12 @@ export default function TemplatesPage() {
       return compareByName(a, b);
     }
 
+    if (sortBy === "oldest") {
+      const recencyDiff = getTemplateRecency(a) - getTemplateRecency(b);
+      if (recencyDiff !== 0) return recencyDiff;
+      return compareByName(a, b);
+    }
+
     // default: recent
     const recencyDiff = getTemplateRecency(b) - getTemplateRecency(a);
     if (recencyDiff !== 0) return recencyDiff;
@@ -195,6 +201,7 @@ return (
             aria-label="Sort guidelines"
           >
             <option value="recent">Recent</option>
+            <option value="oldest">Oldest</option>
             <option value="name">Name</option>
             <option value="popular">Most popular</option>
           </select>
