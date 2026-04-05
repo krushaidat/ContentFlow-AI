@@ -7,7 +7,8 @@
  */
 
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   collection,
   getDocs,
@@ -35,6 +36,7 @@ import { useReviewers } from "./hooks/useReviewers";
 
 // Components
 import ContentList from "./components/ContentList";
+import ContentViewModal from "./components/Contentviewmodal";
 import ValidationPanel from "./components/ValidationPanel";
 import ReviewerCard from "./components/ReviewerCard";
 
@@ -46,9 +48,10 @@ import "../../styles/workflow.css";
 
 const Workflow = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
-  const highlightedContentId = null;
-  const autoAssignInFlightRef = useRef(new Set());
+  const [highlightedContentId, setHighlightedContentId] = useState(null);
+  const [viewingContent, setViewingContent] = useState(null);
 
   // Content management
   const {
@@ -114,6 +117,25 @@ const Workflow = () => {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  /* Aminah update: Highlight content when navigated from a notification or link */
+
+  useEffect(() => {
+    const targetId = location.state?.highlightContentId;
+    if (!targetId) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      setHighlightedContentId(targetId);
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedContentId(null);
+    }, 5000);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timer);
+    };
+  }, [location.state?.highlightContentId, location.state?.notificationId]);
+
   useEffect(() => {
     fetchContent(selectedStage);
     setValidationResult(null);
@@ -121,17 +143,11 @@ const Workflow = () => {
     setShowFixesSummary(false);
 
     if (selectedStage === "Review" && user?.role === "admin") {
-      fetchReviewers({
-        uid: user?.uid,
-        role: user?.role,
-        teamId: user?.teamId,
-      });
+      fetchReviewers(user);
     }
   }, [
     selectedStage,
-    user?.uid,
-    user?.role,
-    user?.teamId,
+    user,
     fetchContent,
     fetchReviewers,
     setValidationResult,
@@ -143,10 +159,6 @@ const Workflow = () => {
     const reviewerId = selectedContent?.reviewerId;
     fetchReviewerName(reviewerId);
   }, [selectedContent?.reviewerId, fetchReviewerName]);
-
-  useEffect(() => {
-    setSelectedReviewer(selectedContent?.reviewerId || "");
-  }, [selectedContent?.id, selectedContent?.reviewerId, setSelectedReviewer]);
 
   // ---- Wrapped handlers ----
   const handleValidate = async () => {
@@ -176,8 +188,7 @@ const Workflow = () => {
       };
 
       if (assignedReviewerId) {
-        updatePayload.reviewerId = assignedReviewerId;
-        updatePayload.assignedAt = new Date().toISOString();
+        updatePayload.suggestedReviewerId = assignedReviewerId;
       }
 
       await updateDoc(doc(db, "content", selectedContent.id), updatePayload);
@@ -207,6 +218,7 @@ const Workflow = () => {
           setSelectedContent(movedItem);
           setValidationResult(movedItem.validation || null);
           setShowValidationPanel(!!movedItem.validation);
+          setSelectedReviewer(null);
         }
 
         setSelectedStage("Review");
@@ -216,8 +228,8 @@ const Workflow = () => {
 
       showAlert(
         assignedReviewerId
-          ? "✅ Content passed! Moved to Review stage and reviewer assigned automatically."
-          : "✅ Content passed! Moved to Review stage.",
+          ? "Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
+          : "Content passed! Moved to Review stage.",
         "success",
       );
     } else if (validation) {
@@ -272,128 +284,44 @@ const Workflow = () => {
   };
 
   const handleAssignReviewerClick = async () => {
+    const effectiveReviewerId =
+      selectedReviewer ||
+      selectedContent?.suggestedReviewerId ||
+      selectedContent?.reviewerId;
+
     const result = await handleAssignReviewer(
-      {
-        uid: user?.uid,
-        role: user?.role,
-        teamId: user?.teamId,
-      },
+      user,
       selectedContent,
-      selectedReviewer,
+      effectiveReviewerId,
       showAlert,
     );
 
-    if (result && selectedReviewer) {
-      const assignedAt = new Date().toISOString();
-
-      setSelectedContent((prev) =>
-        prev
-          ? { ...prev, reviewerId: selectedReviewer, assignedAt }
-          : prev,
-      );
-
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === selectedContent?.id
-            ? { ...item, reviewerId: selectedReviewer, assignedAt }
-            : item,
-        ),
-      );
+    if (result) {
+      setSelectedContent({
+        ...selectedContent,
+        reviewerId: effectiveReviewerId,
+        suggestedReviewerId: null,
+        assignedAt: new Date().toISOString(),
+      });
+      setSelectedReviewer(null);
+      await fetchContent(selectedStage);
     }
   };
 
-  useEffect(() => {
-    const autoAssignReviewer = async () => {
-      const contentId = selectedContent?.id;
-
-      if (
-        selectedStage !== "Review" ||
-        user?.role !== "admin" ||
-        !contentId ||
-        selectedContent?.reviewerId ||
-        availableReviewers.length === 0 ||
-        assigningReviewer ||
-        autoAssignInFlightRef.current.has(contentId)
-      ) {
-        return;
-      }
-
-      autoAssignInFlightRef.current.add(contentId);
-
-      try {
-        const selectedItem =
-          items.find((item) => item.id === contentId) || selectedContent;
-
-        if (!selectedItem) {
-          return;
-        }
-
-        const autoReviewerId =
-          (await assignReviewerWithGemini(selectedItem, availableReviewers)) ||
-          availableReviewers[0]?.uid;
-
-        if (!autoReviewerId) {
-          return;
-        }
-
-        const result = await handleAssignReviewer(
-          {
-            uid: user?.uid,
-            role: user?.role,
-            teamId: user?.teamId,
-          },
-          selectedItem,
-          autoReviewerId,
-          showAlert,
-        );
-
-        if (result) {
-          const assignedAt = new Date().toISOString();
-
-          setSelectedContent((prev) =>
-            prev && prev.id === contentId
-              ? { ...prev, reviewerId: autoReviewerId, assignedAt }
-              : prev,
-          );
-
-          setItems((prev) =>
-            prev.map((item) =>
-              item.id === contentId
-                ? { ...item, reviewerId: autoReviewerId, assignedAt }
-                : item,
-            ),
-          );
-        }
-      } finally {
-        autoAssignInFlightRef.current.delete(contentId);
-      }
-    };
-
-    autoAssignReviewer();
-  }, [
-    selectedStage,
-    user?.uid,
-    user?.role,
-    user?.teamId,
-    selectedContent,
-    availableReviewers,
-    assigningReviewer,
-    handleAssignReviewer,
-    showAlert,
-    setSelectedContent,
-    setItems,
-    items,
-  ]);
-
   const handleSelectContent = (item) => {
     setSelectedContent(item);
-    setSelectedReviewer(item.reviewerId || "");
+    setSelectedReviewer(null);
     setValidationResult(item.validation || null);
     setShowValidationPanel(!!item.validation);
     if (item.validatedTemplateId) {
       setSelectedTemplateId(item.validatedTemplateId);
     }
     setShowFixesSummary(false);
+  };
+
+  const handleViewContent = (item) => {
+    handleSelectContent(item);
+    setViewingContent(item);
   };
 
   // ---- Render ----
@@ -419,7 +347,6 @@ const Workflow = () => {
                 onChange={(e) => {
                   setSelectedStage(e.target.value);
                   setSelectedContent(null);
-                  setSelectedReviewer("");
                 }}
               >
                 {STAGES.map((stage) => (
@@ -443,6 +370,7 @@ const Workflow = () => {
             error={error}
             selectedContent={selectedContent}
             onSelectContent={handleSelectContent}
+            onViewContent={handleViewContent}
             onStageChange={setSelectedStage}
             STAGES={STAGES}
             highlightedContentId={highlightedContentId}
@@ -492,6 +420,11 @@ const Workflow = () => {
           AI validation powered by Gemini API
         </p>
       </div>
+
+      <ContentViewModal
+        content={viewingContent}
+        onClose={() => setViewingContent(null)}
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
+import React, { useCallback, useEffect, useState } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import "./styles/ManageTemplates.css";
 import { fetchTemplates, deleteTemplate } from "../functions/templateDB";
@@ -15,20 +15,37 @@ export default function ManageTemplates({ isOpen, onClose }) {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-    const loadTemplates = async () => {
-      try {
-        const data = await fetchTemplates();
-        setTemplates(data);
-      } catch (error) {
-        console.error("Failed to load templates:", error);
-      }
-    };
+
+
+  /* Aminah update: Moved template loading logic into a useCallback to avoid unnecessary re-renders and added real-time syncing with Firestore using onSnapshot. */
+
+
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const data = await fetchTemplates();
+      setTemplates(data);
+    } catch (error) {
+      console.error("Failed to load templates:", error);
+    }
+  }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      loadTemplates();
-    }
-  }, [isOpen]);
+    if (!isOpen) return undefined;
+
+    const unsubscribe = onSnapshot(
+      collection(db, "templates"),
+      () => {
+        loadTemplates();
+      },
+      (error) => {
+        console.error("Failed to sync templates in real time:", error);
+      },
+    );
+
+    loadTemplates();
+    return unsubscribe;
+  }, [isOpen, loadTemplates]);
     
   if (!isOpen) return null;
 
