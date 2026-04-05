@@ -14,6 +14,7 @@ async function createNotification({
   actorId = null,
   eventKey = null,
   metadata = null,
+  dedupe = true,
 }) {
   if (!recipientId || !title || !message) {
     throw new Error("recipientId, title, and message are required");
@@ -21,7 +22,7 @@ async function createNotification({
 
   const notificationsRef = db.collection("Users").doc(recipientId).collection("notifications");
 
-  if (eventKey) {
+  if (dedupe && eventKey) {
     const existingSnapshot = await notificationsRef.where("eventKey", "==", eventKey).limit(1).get();
     if (!existingSnapshot.empty) {
       return existingSnapshot.docs[0].id;

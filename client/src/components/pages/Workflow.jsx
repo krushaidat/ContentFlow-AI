@@ -34,7 +34,7 @@ const STAGES = [
   "Planning",
   "Review",
   "Update",
-  "Ready-To-Post",
+  "Ready To Post",
   "Posted",
 ];
 
@@ -52,6 +52,7 @@ const stageBadgeClass = (stage) => {
       return "badge badge-review";
     case "Update":
       return "badge badge-update";
+    case "Ready To Post":
     case "Ready-To-Post":
       return "badge badge-ready";
     case "Posted":

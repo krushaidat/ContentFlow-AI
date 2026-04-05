@@ -137,7 +137,7 @@ const ReviewPage = () => {
       
       setAssignedItems(assignedItems.map(item => 
         item.id === itemId 
-          ? { ...item, stage: 'Ready-To-Post', reviewStatus: 'approved', rejectionReason: undefined }
+          ? { ...item, stage: 'Ready To Post', reviewStatus: 'approved', rejectionReason: undefined }
           : item
       ));
       showAlert('Content approved successfully!', 'success');
@@ -217,6 +217,7 @@ const ReviewPage = () => {
       review: "badge-review",
       update: "badge-update",
       "ready-to-post": "badge-ready",
+      "ready to post": "badge-ready",
     };
     return statusMap[stage?.toLowerCase()] || "badge-draft";
   };

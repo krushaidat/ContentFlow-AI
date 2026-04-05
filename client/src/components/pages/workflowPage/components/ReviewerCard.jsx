@@ -11,10 +11,14 @@ const ReviewerCard = ({
   selectedContent,
   currentReviewerName,
   availableReviewers,
+  selectedReviewer,
   assigningReviewer,
   reviewerError,
+  onSelectReviewer,
+  onAssignReviewer,
 }) => {
   const currentAssignmentId = selectedContent?.reviewerId;
+  const isSameReviewer = Boolean(selectedReviewer) && selectedReviewer === currentAssignmentId;
 
   // Only show for Review stage and admin users
   if (selectedStage !== "Review" || userRole !== "admin" || !selectedContent) {
@@ -46,17 +50,36 @@ const ReviewerCard = ({
           </div>
 
           <div className="reviewer-section">
-            <label className="reviewer-label">Auto Assignment</label>
             {availableReviewers.length > 0 ? (
-              <div className="reviewer-empty">
-                {assigningReviewer ? (
-                  <p>Assigning reviewer automatically...</p>
-                ) : currentAssignmentId ? (
-                  <p>Reviewer assignment is automatic in Review stage.</p>
-                ) : (
-                  <p>Reviewer will be assigned automatically.</p>
-                )}
-              </div>
+              <>
+                <div className="select-wrap">
+                  <select
+                    className="select reviewer-select"
+                    value={selectedReviewer || ""}
+                    onChange={(e) => onSelectReviewer(e.target.value)}
+                  >
+                    <option value="">Choose a reviewer...</option>
+                    {availableReviewers.map((reviewer) => (
+                      <option key={reviewer.uid} value={reviewer.uid}>
+                        {reviewer.name || reviewer.email} ({reviewer.currentLoad || 0}/5)
+                      </option>
+                    ))}
+                  </select>
+                  <span className="select-caret">▾</span>
+                </div>
+
+                <button
+                  className="assign-reviewer-btn"
+                  onClick={onAssignReviewer}
+                  disabled={!selectedReviewer || isSameReviewer || assigningReviewer}
+                >
+                  {assigningReviewer
+                    ? "Assigning..."
+                    : currentAssignmentId && !isSameReviewer
+                      ? "Reassign Reviewer"
+                      : "Assign Selected Reviewer"}
+                </button>
+              </>
             ) : (
               <div className="reviewer-empty">
                 <p>No reviewers available in your team.</p>

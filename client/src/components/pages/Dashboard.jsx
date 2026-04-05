@@ -12,6 +12,18 @@ import useInPageAlert from "../../hooks/useInPageAlert";
 import InPageAlert from "../InPageAlert";
 
 const auth = getAuth();
+const READY_TO_POST_LABEL = "Ready To Post";
+const READY_TO_POST_STAGE_ALIASES = [
+  READY_TO_POST_LABEL,
+  "Ready to Post",
+  "Ready-To-Post",
+];
+
+const isReadyToPostStage = (stage) =>
+  READY_TO_POST_STAGE_ALIASES.includes(stage);
+
+const normalizeStageLabel = (stage) =>
+  isReadyToPostStage(stage) ? READY_TO_POST_LABEL : stage;
 
 export default function Dashboard() {
   const ALL_STAGES = "All Stages";
@@ -20,7 +32,7 @@ export default function Dashboard() {
   "Draft",
   "Review",
   "Update",
-  "Ready to Post",
+  READY_TO_POST_LABEL,
   "Posted",
 ];
 const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -170,7 +182,11 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
       // This matches Firestore security rules that allow reading only own documents
       const filters = [where("createdBy", "==", currentUser.uid)];
       if (selectedStage && selectedStage !== ALL_STAGES) {
-        filters.push(where("stage", "==", selectedStage));
+        if (isReadyToPostStage(selectedStage)) {
+          filters.push(where("stage", "in", READY_TO_POST_STAGE_ALIASES));
+        } else {
+          filters.push(where("stage", "==", selectedStage));
+        }
       }
       const q = query(
         collection(db, "content"),
@@ -179,10 +195,14 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
       const querySnapshot = await getDocs(q);
       // Performance fix: Sort on client-side instead of orderBy in query
       // Avoids needing a composite index and reduces quota errors
-      const items = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const items = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          stage: normalizeStageLabel(data.stage),
+        };
+      }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setContent(items);
       setError(null);
     } catch (err) {
@@ -229,8 +249,15 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
     // Ensure the highlighted item is visible in the dashboard list.
     setSearch("");
     setSelectedStage(ALL_STAGES);
-    setPendingHighlightId(targetId);
-  }, [ALL_STAGES, location.state?.highlightContentId]);
+    setHighlightedContentId(null);
+    setPendingHighlightId(null);
+
+    const frameId = window.requestAnimationFrame(() => {
+      setPendingHighlightId(targetId);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [ALL_STAGES, location.state?.highlightContentId, location.state?.notificationId]);
 
   useEffect(() => {
     if (!pendingHighlightId || content.length === 0) return;
@@ -252,6 +279,8 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
     return () => clearTimeout(timer);
   }, [pendingHighlightId, content]);
 
+
+  // Aminah: content menu click outside handler
   useEffect(() => {
     const handleClickOutsideMenu = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -655,7 +684,7 @@ const handleUploadContentToDrive = async (item) => {
           </div>
           <div className="dashboard-card-body">
             <div className="dashboard-card-title">Create Content</div>
-            <div className="dashboard-card-desc">Start a new post. Choose a template and write your content.</div>
+            <div className="dashboard-card-desc">Start a new post and write your content.</div>
             <div className="dashboard-create-actions">
               <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
                 + Create Content
@@ -675,11 +704,12 @@ const handleUploadContentToDrive = async (item) => {
             <span role="img" aria-label="Templates" style={{fontSize: 32}}>📄</span>
           </div>
           <div className="dashboard-card-body">
-            <div className="dashboard-card-title">Templates</div>
-            <div className="dashboard-card-desc">Manage and modify templates to ensure brand consistency.</div>
+          <div className="dashboard-card-title">AI Guidelines</div>
+          <div className="dashboard-card-desc">
+            Manage AI validation guidelines used to check content quality and brand consistency.
+          </div>
             <button className="dashboard-card-btn secondary" onClick={handleManageTemplates}>
-              Manage Templates
-            </button>
+            Manage AI Guidelines            </button>
           </div>
         </div>
       </div>
@@ -745,6 +775,7 @@ const handleUploadContentToDrive = async (item) => {
                   - Buttons now positioned at top-right of each card*/}
                 <div className="dashboard-content-actions" ref={openMenuId === item.id ? menuRef : null}>
                   <button
+                    type="button"
                     className="icon-btn more"
                     onClick={(e) => toggleContentMenu(e, item.id)}
                     title="More options"
@@ -762,6 +793,8 @@ const handleUploadContentToDrive = async (item) => {
                   {openMenuId === item.id && (
                     <div className="dashboard-content-menu" role="menu">
                       <button
+                        type="button"
+                        role="menuitem"
                         className="dashboard-content-menu-item"
                         onClick={(e) => {
                           setOpenMenuId(null);
@@ -771,6 +804,8 @@ const handleUploadContentToDrive = async (item) => {
                         Version History
                       </button>
                       <button
+                        type="button"
+                        role="menuitem"
                         className="dashboard-content-menu-item"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -782,6 +817,8 @@ const handleUploadContentToDrive = async (item) => {
                         {driveUploadingId === item.id ? "Uploading..." : "Upload to Drive"}
                       </button>
                       <button
+                        type="button"
+                        role="menuitem"
                         className="dashboard-content-menu-item"
                         onClick={(e) => {
                           setOpenMenuId(null);
@@ -791,6 +828,8 @@ const handleUploadContentToDrive = async (item) => {
                         Edit Content
                       </button>
                       <button
+                        type="button"
+                        role="menuitem"
                         className="dashboard-content-menu-item danger"
                         onClick={(e) => {
                           setOpenMenuId(null);
@@ -805,7 +844,7 @@ const handleUploadContentToDrive = async (item) => {
               </div>
               <div className="content-item-title">{item.title}</div>
               <div className="content-item-text">{item.text}</div>
-              {item.rejectionReason && item.stage !== "Ready to Post" && item.stage !== "Ready-To-Post" && (
+              {item.rejectionReason && !isReadyToPostStage(item.stage) && (
                 <div className="rejection-reason">
                   <strong>Feedback:</strong> {item.rejectionReason}
                 </div>
@@ -818,43 +857,26 @@ const handleUploadContentToDrive = async (item) => {
               
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}
-                {(item.stage === "Ready to Post" || item.stage === "Ready-To-Post") && (
-  <>
-    <div className="form-group" style={{ marginTop: "8px", marginBottom: "8px" }}>
-      <label style={{ display: "block", marginBottom: "6px", fontWeight: 600 }}>
-        AI Scheduling Window
-      </label>
-      <select
-        className="edit-select"
-        value={aiScheduleRangeDays}
-        onChange={(e) => setAiScheduleRangeDays(Number(e.target.value))}
-      >
-        <option value={1}>Next 1 day</option>
-        <option value={2}>Next 2 days</option>
-        <option value={3}>Next 3 days</option>
-        <option value={7}>Next 7 days</option>
-      </select>
-    </div>
-
+                {isReadyToPostStage(item.stage) && (
+  <div className="schedule-actions-row">
     <button
-      className="dashboard-card-btn schedule-btn"
+      className="schedule-action-btn ai-schedule-btn"
       onClick={() => handleSuggestPostingTime(item)}
       disabled={schedulingPostId === item.id}
-      style={{ marginTop: "8px", marginBottom: "8px" }}
+      title="Let AI find the best posting time"
     >
-      {schedulingPostId === item.id
-        ? "Suggesting Time..."
-        : "Suggest Posting Time Using AI"}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6H8l4 6 4-6h-2c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><path d="M8 18h8"/><path d="M9 22h6"/></svg>
+      {schedulingPostId === item.id ? "Suggesting..." : "AI Schedule"}
     </button>
-
     <button
-      className="dashboard-card-btn secondary-schedule-btn"
+      className="schedule-action-btn manual-schedule-btn"
       onClick={() => handleOpenScheduleModal(item)}
-      style={{ marginTop: "0px", marginBottom: "8px" }}
+      title="Manually schedule this post"
     >
-      Schedule This Post
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Schedule
     </button>
-  </>
+  </div>
 )}
 
             </div>
@@ -908,7 +930,7 @@ const handleUploadContentToDrive = async (item) => {
                     <option value="Planning">Planning</option>
                     <option value="Review">Review</option>
                     <option value="Update">Update</option>
-                    <option value="Ready to Post">Ready to Post</option>
+                    <option value="Ready To Post">Ready To Post</option>
                   </select>
                 </div>
                 
@@ -929,11 +951,48 @@ const handleUploadContentToDrive = async (item) => {
   <div className="modal-overlay" onClick={handleCloseScheduleModal}>
     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
-        <h3>Schedule This Post</h3>
+        <h3>Schedule Post</h3>
         <button className="modal-close" onClick={handleCloseScheduleModal}>×</button>
       </div>
 
       <div className="modal-body">
+        {/* AI Scheduling Section */}
+        <div className="schedule-section">
+          <div className="schedule-section-label">AI Scheduling</div>
+          <div className="schedule-ai-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label htmlFor="ai-schedule-range">Search Window</label>
+              <select
+                id="ai-schedule-range"
+                className="edit-select"
+                value={aiScheduleRangeDays}
+                onChange={(e) => setAiScheduleRangeDays(Number(e.target.value))}
+              >
+                <option value={1}>Next 1 day</option>
+                <option value={2}>Next 2 days</option>
+                <option value={3}>Next 3 days</option>
+                <option value={7}>Next 7 days</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn-save schedule-ai-btn"
+              onClick={() => {
+                handleCloseScheduleModal();
+                handleSuggestPostingTime(selectedPostForSchedule);
+              }}
+              disabled={schedulingPostId === selectedPostForSchedule?.id}
+            >
+              {schedulingPostId === selectedPostForSchedule?.id ? "Finding..." : "Find Best Time"}
+            </button>
+          </div>
+        </div>
+
+        <div className="schedule-divider">
+          <span>or schedule manually</span>
+        </div>
+
+        {/* Manual Scheduling Section */}
       <div className="form-group">
   <label htmlFor="manual-schedule-date">Date</label>
   <input

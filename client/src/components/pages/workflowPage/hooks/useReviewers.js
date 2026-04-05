@@ -12,6 +12,7 @@ import { collection, query, getDocs } from "firebase/firestore";
 
 export const useReviewers = () => {
   const [availableReviewers, setAvailableReviewers] = useState([]);
+  const [selectedReviewer, setSelectedReviewer] = useState("");
   const [assigningReviewer, setAssigningReviewer] = useState(false);
   const [reviewerError, setReviewerError] = useState("");
   const [currentReviewerName, setCurrentReviewerName] = useState(null);
@@ -48,7 +49,7 @@ export const useReviewers = () => {
       !user?.uid ||
       user?.role !== "admin"
     ) {
-      setReviewerError("Unable to auto-assign reviewer");
+      setReviewerError("Please select a reviewer");
       return;
     }
 
@@ -109,6 +110,8 @@ export const useReviewers = () => {
 
   return {
     availableReviewers,
+    selectedReviewer,
+    setSelectedReviewer,
     assigningReviewer,
     reviewerError,
     currentReviewerName,

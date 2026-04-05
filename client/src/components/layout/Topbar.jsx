@@ -171,6 +171,12 @@ const Topbar = ({
     if (type === "content_updated") {
       return { route: "/review", label: "Go to review" };
     }
+    if (type === "content_rejected") {
+      return { route: "/dashboard", label: "View feedback" };
+    }
+    if (type === "ready_to_post") {
+      return { route: "/dashboard", label: "Open content" };
+    }
     if (type === "content_scheduled") {
       return { route: "/calendar", label: "Go to calendar" };
     }

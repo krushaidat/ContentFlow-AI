@@ -10,56 +10,19 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { collection, addDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
-import { fetchTemplates, incrementTemplateUsage } from "../functions/templateDB";
 import "./styles/createContent.css";
 
 const API_BASE = "http://localhost:5000/api";
 
-const CONTENT_TEMPLATES = [
-  {
-    id: "company-announcement",
-    name: "Company Announcement",
-    title: "Company Announcement: ",
-    text: "Share company news and updates:\n\n• Key announcement:\n• Why it matters:\n• Call to action:",
-    description: "Structure for announcing company news",
-    modified: "Feb 5, 2026",
-  },
-  {
-    id: "new-product-launch",
-    name: "New Product",
-    title: "The Product: ",
-    text: "Introduce your new product:\n\n• Key features:\n• Who will benefit:\n• Launch date & availability:",
-    description: "Structure for detailing new product launches",
-    modified: "Feb 4, 2026",
-  },
-  {
-    id: "Product Update",
-    name: "Product Update",
-    title: "Product Update: ",
-    text: "Notify users about the latest product improvements:\n\n• What's new:\n• Benefits:\n• How to access:",
-    description: "Structure for communicating product updates",
-    modified: "Feb 3, 2026",
-  },
-  {
-    id: "Newsletter",
-    name: "Weekly Newsletter",
-    title: "Weekly Newsletter: ",
-    text: "Outline for curating weekly newsletter content:\n\n• Top story:\n• Highlights:\n• Links & CTAs:",
-    description: "Outline for curating weekly newsletter content",
-    modified: "Feb 2, 2026",
-  },
-];
+
 
 const CreateContent = ({ isOpen, onClose, onSuccess }) => {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [stage, setStatus] = useState("Draft");
-  const [selectedTemplate, setSelectedTemplate] = useState("");
-  const [showTemplates, setShowTemplates] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [templateSearch, setTemplateSearch] = useState("");
-  const [savedTemplates, setSavedTemplates] = useState([]);
+ 
 
   // AI writing assist
   const [aiSuggestions, setAiSuggestions] = useState([]);
@@ -71,77 +34,48 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
   const auth = getAuth();
   const user = auth.currentUser;
 
-  const allTemplates = [
-    ...savedTemplates,
-    ...CONTENT_TEMPLATES,
-  ].filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
 
-  const filteredTemplates = allTemplates.filter(
-    (t) =>
-      t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
-      t.description.toLowerCase().includes(templateSearch.toLowerCase())
-  );
 
-  const selectedTemplateName = allTemplates.find((t) => t.id === selectedTemplate)?.name;
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const loadSavedTemplates = async () => {
-      try {
-        const templates = await fetchTemplates();
-        setSavedTemplates(
-          templates.map((t) => ({
-            id: t.id,
-            name: t.title || "Untitled Template",
-            title: t.title ? `${t.title}: ` : "",
-            text: t.content || "",
-            description: t.content || "Saved custom template",
-            modified: "Saved template",
-          }))
-        );
-      } catch (err) {
-        console.error("Failed to load saved templates:", err);
-      }
-    };
-    loadSavedTemplates();
-  }, [isOpen]);
+  // Abdalaa: template selection was removed from create content,
+// so AI suggestions no longer depend on any selected template here.
+const requestAiSuggestions = useCallback(
+  async (currentText) => {
+    if (!currentText || currentText.trim().length < 15) {
+      setAiSuggestions([]);
+      setShowAiPanel(false);
+      return;
+    }
 
-  // AI writing assist — debounced
-  const requestAiSuggestions = useCallback(
-    async (currentText) => {
-      if (!currentText || currentText.trim().length < 15) {
+    setAiLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/ai/writing-assist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentText,
+          templateId: null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.suggestions?.length > 0) {
+        setAiSuggestions(data.suggestions);
+        setShowAiPanel(true);
+      } else {
         setAiSuggestions([]);
         setShowAiPanel(false);
-        return;
       }
-
-      setAiLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/ai/writing-assist`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            currentText,
-            templateId: selectedTemplate || null,
-          }),
-        });
-        const data = await res.json();
-        if (data.success && data.suggestions?.length > 0) {
-          setAiSuggestions(data.suggestions);
-          setShowAiPanel(true);
-        } else {
-          setAiSuggestions([]);
-          setShowAiPanel(false);
-        }
-      } catch {
-        setAiSuggestions([]);
-        setShowAiPanel(false);
-      } finally {
-        setAiLoading(false);
-      }
-    },
-    [selectedTemplate]
-  );
+    } catch {
+      setAiSuggestions([]);
+      setShowAiPanel(false);
+    } finally {
+      setAiLoading(false);
+    }
+  },
+  []
+);
 
   const handleTextChange = (e) => {
     const newText = e.target.value;
@@ -175,19 +109,17 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         title: title.trim(),
         text: text.trim(),
         stage,
-        templateId: selectedTemplate || "new-product-launch",
+        // Abdalaa: content is created first.
+        // AI guidelines are managed separately and used later in validation.
         createdBy: user.uid,
         createdAt: new Date().toISOString(),
       });
 
-      if (selectedTemplate) {
-        const isSaved = savedTemplates.some((t) => t.id === selectedTemplate);
-        if (isSaved) {
-          try { await incrementTemplateUsage(selectedTemplate); } catch {}
-        }
-      }
+     
 
-      setTitle(""); setText(""); setStatus("Draft"); setSelectedTemplate("");
+      setTitle("");
+      setText("");
+      setStatus("Draft");
       setAiSuggestions([]); setShowAiPanel(false);
       if (onSuccess) onSuccess();
       onClose();
@@ -199,19 +131,12 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
-  const handleTemplateSelect = (templateId) => {
-    if (!templateId) { setSelectedTemplate(""); setTitle(""); setText(""); setShowTemplates(false); return; }
-    const template = allTemplates.find((t) => t.id === templateId);
-    if (!template) return;
-    setSelectedTemplate(templateId);
-    setTitle(template.title);
-    setText(template.text);
-    setShowTemplates(false);
-    setAiSuggestions([]); setShowAiPanel(false);
-  };
+
 
   const handleClose = () => {
-    setTitle(""); setText(""); setStatus("Draft"); setSelectedTemplate("");
+    setTitle("");
+    setText("");
+    setStatus("Draft");
     setError(null); setAiSuggestions([]); setShowAiPanel(false);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     onClose();
@@ -228,17 +153,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="create-content-form">
-          <div className="form-group">
-            <label>Start from a Template</label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button type="button" className="btn-submit" onClick={() => setShowTemplates(true)} disabled={loading} style={{ padding: "8px 12px", fontSize: 14 }}>
-                Select Template
-              </button>
-              <div style={{ fontSize: 14, color: "#374151" }}>
-                {selectedTemplateName ? `Selected: ${selectedTemplateName}` : "Blank Content"}
-              </div>
-            </div>
-          </div>
+        
 
           <div className="form-group">
             <label htmlFor="title">Title</label>
@@ -279,7 +194,7 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
               <option value="Planning">Planning</option>
               <option value="Review">Review</option>
               <option value="Update">Update</option>
-              <option value="Ready to Post">Ready to Post</option>
+              <option value="Ready To Post">Ready To Post</option>
             </select>
           </div>
 
@@ -290,45 +205,6 @@ const CreateContent = ({ isOpen, onClose, onSuccess }) => {
             <button type="submit" className="btn-submit" disabled={loading}>{loading ? "Creating..." : "Create Content"}</button>
           </div>
         </form>
-
-        {showTemplates && (
-          <div className="templates-overlay" onClick={() => setShowTemplates(false)}>
-            <div className="templates-panel" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header templates-header">
-                <div className="templates-header-left">
-                  <span className="templates-header-icon">📄</span>
-                  <h2>Templates</h2>
-                  <span className="templates-header-desc">Manage and modify templates to ensure brand consistency.</span>
-                </div>
-                <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
-              </div>
-              <div className="templates-search-row">
-                <input className="templates-search" placeholder="Search templates..." value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} />
-              </div>
-              <div className="templates-grid">
-                {filteredTemplates.length === 0 ? (
-                  <div style={{ padding: 24, color: "#6b7280", fontSize: 16 }}>No templates found.</div>
-                ) : (
-                  filteredTemplates.map((t) => (
-                    <div key={t.id} className="template-card">
-                      <div className="template-card-icon">
-                        {t.id === "company-announcement" ? "📢" : t.id === "new-product-launch" ? "🛒" : t.id === "Product Update" ? "🎫" : "📄"}
-                      </div>
-                      <div className="template-card-body">
-                        <div className="template-card-title">{t.name}</div>
-                        <div className="template-card-desc">{t.description}</div>
-                        <div className="template-card-meta">Last modified {t.modified}</div>
-                      </div>
-                      <div className="template-card-actions">
-                        <button className="btn-template-select" onClick={() => { setShowTemplates(false); handleTemplateSelect(t.id); }}>Select</button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

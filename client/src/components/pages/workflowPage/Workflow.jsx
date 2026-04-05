@@ -6,6 +6,7 @@
  * automatic fixes, and reviewer assignment.
  */
 
+
 import React, { useEffect, useRef } from "react";
 import {
   collection,
@@ -38,7 +39,7 @@ import ValidationPanel from "./components/ValidationPanel";
 import ReviewerCard from "./components/ReviewerCard";
 
 // Constants
-import { STAGES, API_BASE } from "./constants";
+import { STAGES } from "./constants";
 
 // Styles
 import "../../styles/workflow.css";
@@ -93,6 +94,8 @@ const Workflow = () => {
   // Reviewers
   const {
     availableReviewers,
+    selectedReviewer,
+    setSelectedReviewer,
     assigningReviewer,
     reviewerError,
     currentReviewerName,
@@ -121,6 +124,7 @@ const Workflow = () => {
       fetchReviewers({
         uid: user?.uid,
         role: user?.role,
+        teamId: user?.teamId,
       });
     }
   }, [
@@ -139,6 +143,10 @@ const Workflow = () => {
     const reviewerId = selectedContent?.reviewerId;
     fetchReviewerName(reviewerId);
   }, [selectedContent?.reviewerId, fetchReviewerName]);
+
+  useEffect(() => {
+    setSelectedReviewer(selectedContent?.reviewerId || "");
+  }, [selectedContent?.id, selectedContent?.reviewerId, setSelectedReviewer]);
 
   // ---- Wrapped handlers ----
   const handleValidate = async () => {
@@ -263,14 +271,46 @@ const Workflow = () => {
     }
   };
 
+  const handleAssignReviewerClick = async () => {
+    const result = await handleAssignReviewer(
+      {
+        uid: user?.uid,
+        role: user?.role,
+        teamId: user?.teamId,
+      },
+      selectedContent,
+      selectedReviewer,
+      showAlert,
+    );
+
+    if (result && selectedReviewer) {
+      const assignedAt = new Date().toISOString();
+
+      setSelectedContent((prev) =>
+        prev
+          ? { ...prev, reviewerId: selectedReviewer, assignedAt }
+          : prev,
+      );
+
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === selectedContent?.id
+            ? { ...item, reviewerId: selectedReviewer, assignedAt }
+            : item,
+        ),
+      );
+    }
+  };
+
   useEffect(() => {
     const autoAssignReviewer = async () => {
       const contentId = selectedContent?.id;
+
       if (
         selectedStage !== "Review" ||
         user?.role !== "admin" ||
         !contentId ||
-        selectedContent.reviewerId ||
+        selectedContent?.reviewerId ||
         availableReviewers.length === 0 ||
         assigningReviewer ||
         autoAssignInFlightRef.current.has(contentId)
@@ -281,7 +321,9 @@ const Workflow = () => {
       autoAssignInFlightRef.current.add(contentId);
 
       try {
-        const selectedItem = items.find((item) => item.id === contentId) || selectedContent;
+        const selectedItem =
+          items.find((item) => item.id === contentId) || selectedContent;
+
         if (!selectedItem) {
           return;
         }
@@ -295,7 +337,11 @@ const Workflow = () => {
         }
 
         const result = await handleAssignReviewer(
-          user,
+          {
+            uid: user?.uid,
+            role: user?.role,
+            teamId: user?.teamId,
+          },
           selectedItem,
           autoReviewerId,
           showAlert,
@@ -326,7 +372,9 @@ const Workflow = () => {
     autoAssignReviewer();
   }, [
     selectedStage,
-    user,
+    user?.uid,
+    user?.role,
+    user?.teamId,
     selectedContent,
     availableReviewers,
     assigningReviewer,
@@ -339,6 +387,7 @@ const Workflow = () => {
 
   const handleSelectContent = (item) => {
     setSelectedContent(item);
+    setSelectedReviewer(item.reviewerId || "");
     setValidationResult(item.validation || null);
     setShowValidationPanel(!!item.validation);
     if (item.validatedTemplateId) {
@@ -370,6 +419,7 @@ const Workflow = () => {
                 onChange={(e) => {
                   setSelectedStage(e.target.value);
                   setSelectedContent(null);
+                  setSelectedReviewer("");
                 }}
               >
                 {STAGES.map((stage) => (
@@ -429,8 +479,11 @@ const Workflow = () => {
               selectedContent={selectedContent}
               currentReviewerName={currentReviewerName}
               availableReviewers={availableReviewers}
+              selectedReviewer={selectedReviewer}
               assigningReviewer={assigningReviewer}
               reviewerError={reviewerError}
+              onSelectReviewer={setSelectedReviewer}
+              onAssignReviewer={handleAssignReviewerClick}
             />
           </div>
         </div>

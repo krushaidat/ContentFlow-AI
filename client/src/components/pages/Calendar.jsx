@@ -38,20 +38,34 @@ const [currentDate, setCurrentDate] = useState(new Date());
 
   // Handle notification highlight on arrival
   useEffect(() => {
-    if (location.state?.highlightContentId) {
-      setHighlightedEventId(location.state.highlightContentId);
-      // Jump to event's date if it exists
-      const matchingEvent = events.find(e => e.postId === location.state.highlightContentId || e.id === location.state.highlightContentId);
-      if (matchingEvent && matchingEvent.suggestedDate) {
-        const [year, month, day] = matchingEvent.suggestedDate.split('-');
-        setCurrentDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
-      }
-      const timer = setTimeout(() => {
-        setHighlightedEventId(null);
-      }, 5000);
-      return () => clearTimeout(timer);
+    const targetId = location.state?.highlightContentId;
+    if (!targetId) return;
+
+    setHighlightedEventId(null);
+
+    // Jump to the event's date when it exists in the loaded calendar data.
+    const matchingEvent = events.find(
+      (event) => event.postId === targetId || event.id === targetId,
+    );
+    const eventDate = matchingEvent?.suggestedDate || matchingEvent?.date;
+
+    if (eventDate) {
+      const [year, month, day] = eventDate.split("-");
+      setCurrentDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
     }
-  }, [location.state?.highlightContentId, events]);
+
+    const frameId = window.requestAnimationFrame(() => {
+      setHighlightedEventId(targetId);
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedEventId(null);
+    }, 5000);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timer);
+    };
+  }, [location.state?.highlightContentId, location.state?.notificationId, events]);
 
   const [editSchedule, setEditSchedule] = useState({
   date: "",

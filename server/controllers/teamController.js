@@ -337,7 +337,7 @@ exports.submitReviewDecision = async (req, res) => {
     };
 
     if (decision === "approved") {
-      updatePayload.stage = "Ready-To-Post";
+      updatePayload.stage = "Ready To Post";
       updatePayload.rejectionReason = admin.firestore.FieldValue.delete();
     } else {
       updatePayload.stage = "Update";
@@ -363,10 +363,12 @@ exports.submitReviewDecision = async (req, res) => {
           message: `${reviewerName} approved \"${contentTitle}\". It's now ready to post.`,
           contentId,
           actorId: reviewerId,
-          eventKey: `ready_to_post_${contentId}_${reviewerId}`,
+          eventKey: `ready_to_post_${contentId}_${reviewerId}_${updatePayload.reviewedAt}`,
+          dedupe: false,
           metadata: {
             contentTitle,
             reviewStatus: decision,
+            reviewedAt: updatePayload.reviewedAt,
           },
         });
       } else {
@@ -377,11 +379,13 @@ exports.submitReviewDecision = async (req, res) => {
           message: `${reviewerName} requested updates for \"${contentTitle}\".`,
           contentId,
           actorId: reviewerId,
-          eventKey: `content_rejected_${contentId}_${reviewerId}`,
+          eventKey: `content_rejected_${contentId}_${reviewerId}_${updatePayload.reviewedAt}`,
+          dedupe: false,
           metadata: {
             contentTitle,
             reviewStatus: decision,
             rejectionReason: String(rejectionReason || "").trim(),
+            reviewedAt: updatePayload.reviewedAt,
           },
         });
       }

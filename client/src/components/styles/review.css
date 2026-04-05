@@ -473,5 +473,5 @@ textarea:focus {
 }
 
 .notification-highlight {
-  animation: orange-glow 5s ease-in-out forwards;
+  animation: orange-glow 5s ease-in-out 1;
 }

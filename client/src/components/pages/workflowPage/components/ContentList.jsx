@@ -1,5 +1,5 @@
 /**
- * ContentList Component - Tanvir
+ * ContentList Component - Tanvir (UI refreshed)
  * Displays content items grouped by workflow stage
  */
 
@@ -13,8 +13,7 @@ const ContentList = ({
   error,
   selectedContent,
   onSelectContent,
-  onStageChange,
-  STAGES,
+  onViewContent,
   highlightedContentId,
 }) => {
   return (
@@ -46,52 +45,76 @@ const ContentList = ({
 
         {!loading && !error && items.length > 0 && (
           <ul className="wf-list">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className={`wf-item ${selectedContent?.id === item.id ? "active" : ""} ${highlightedContentId === item.id ? "notification-highlight" : ""}`}
-                onClick={() => onSelectContent(item)}
-              >
-                <div className="wf-item-top">
-                  <div className="wf-item-title">{item.title}</div>
-                  <span className={stageBadgeClass(item.stage)}>
-                    {item.stage}
-                  </span>
-                </div>
-                <div className="wf-item-text">
-                  {item.text?.substring(0, 120)}
-                  {item.text?.length > 120 ? "…" : ""}
-                </div>
-                {item.validation && (
-                  <div className="wf-item-validation">
-                    <span
-                      className={`wf-validation-badge ${
-                        item.validation.brandScore >= 90
-                          ? "score-high"
-                          : "score-low"
-                      }`}
-                    >
-                      {item.validation.brandScore}/100
-                    </span>
-                    {item.validation.brandScore >= 90 ? (
-                      <span className="wf-validation-status valid">
-                        ✓ Ready for Review
-                      </span>
-                    ) : (
-                      <span className="wf-validation-status invalid">
-                        ⚠ Needs Fixes
-                      </span>
-                    )}
+            {items.map((item) => {
+              const isActive = selectedContent?.id === item.id;
+              const brandScore = item.validation?.brandScore;
+              const hasValidation = item.validation != null;
+
+              return (
+                <li
+                  key={item.id}
+                  className={`wf-item ${isActive ? "active" : ""} ${highlightedContentId === item.id ? "notification-highlight" : ""}`}
+                  onClick={() => onSelectContent(item)}
+                >
+                  {/* Top row: title + view btn */}
+                  <div className="wf-item-top">
+                    <div className="wf-item-title">{item.title}</div>
+                    <div className="wf-item-actions">
+                      <button
+                        className="wf-view-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (typeof onViewContent === "function") {
+                            onViewContent(item);
+                          } else {
+                            onSelectContent(item);
+                          }
+                        }}
+                        title="View full content"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                )}
-                <div className="wf-item-footer">
-                  <span className="wf-dot" />
-                  <span className="wf-muted">
-                    Created: {String(item.createdAt).slice(0, 10)}
-                  </span>
-                </div>
-              </li>
-            ))}
+
+                  {/* Preview text */}
+                  <div className="wf-item-text">
+                    {item.text?.substring(0, 100)}
+                    {item.text?.length > 100 ? "…" : ""}
+                  </div>
+
+                  {/* Bottom row: validation + date */}
+                  <div className="wf-item-bottom">
+                    {hasValidation && (
+                      <div className="wf-item-validation">
+                        <span
+                          className={`wf-score-chip ${
+                            brandScore >= 90
+                              ? "score-high"
+                              : brandScore >= 60
+                                ? "score-mid"
+                                : "score-low"
+                          }`}
+                        >
+                          {brandScore}/100
+                        </span>
+                        {brandScore >= 90 ? (
+                          <span className="wf-status-tag valid">✓ Ready</span>
+                        ) : (
+                          <span className="wf-status-tag invalid">⚠ Needs Fixes</span>
+                        )}
+                      </div>
+                    )}
+                    <span className="wf-item-date">
+                      {String(item.createdAt).slice(0, 10)}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
