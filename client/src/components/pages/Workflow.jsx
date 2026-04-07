@@ -1,16 +1,14 @@
 /**
  * Workflow Page
- * Author: Abdalaa & Tanvir
+ * Authors: Abdalaa, Tanvir (refactored)
  *
- * This page displays user content grouped by workflow stage.
- * We fetch content from Firestore and filter by:
- *  - logged-in user (createdBy field in Firestore)
- *  - selected stage (stage field in Firestore)
- *
- * UI upgraded with purple accents and a modern layout.
+ * Displays user content grouped by workflow stage.
+ * Right panel provides AI-powered validation against dynamically-loaded
+ * Firestore templates and an "Apply Fixes" feature that rewrites content
+ * to satisfy the selected guideline, then automatically re-validates.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   collection,
   getDocs,
@@ -24,89 +22,111 @@ import {
 import { db, auth } from "../../firebase";
 import { useAuth } from "../../hooks/useAuth";
 import useInPageAlert from "../../hooks/useInPageAlert";
-import { assignReviewerWithGemini, getAvailableReviewers } from "../../utils/geminiReviewerAssignment";
+import {
+  assignReviewerWithGemini,
+  getAvailableReviewers,
+} from "../../utils/geminiReviewerAssignment";
 import InPageAlert from "../InPageAlert";
 import "../styles/workflow.css";
 
-// These stages must match exactly what we store in Firestore
+const API_BASE = "http://localhost:5000/api";
+
 const STAGES = [
   "Draft",
   "Planning",
   "Review",
   "Update",
-  "Ready To Post",
+  "Ready-To-Post",
   "Posted",
 ];
 
-/**
- * Small helper to assign badge colors based on stage.
- * Makes the UI feel more dynamic instead of flat.
- */
 const stageBadgeClass = (stage) => {
-  switch (stage) {
-    case "Draft":
-      return "badge badge-draft";
-    case "Planning":
-      return "badge badge-planning";
-    case "Review":
-      return "badge badge-review";
-    case "Update":
-      return "badge badge-update";
-    case "Ready To Post":
-    case "Ready-To-Post":
-      return "badge badge-ready";
-    case "Posted":
-      return "badge badge-posted";
-    default:
-      return "badge";
-  }
+  const map = {
+    Draft: "badge badge-draft",
+    Planning: "badge badge-planning",
+    Review: "badge badge-review",
+    Update: "badge badge-update",
+    "Ready-To-Post": "badge badge-ready",
+    Posted: "badge badge-posted",
+  };
+  return map[stage] || "badge";
 };
 
 const Workflow = () => {
   const { user } = useAuth();
-  
-  // Stage selected in dropdown
+
+  // Stage & content
   const [selectedStage, setSelectedStage] = useState("Draft");
-
-  // Content returned from Firestore
   const [items, setItems] = useState([]);
-
-  // Selected template and content
-  const [selectedTemplate, setSelectedTemplate] = useState("New Product");
   const [selectedContent, setSelectedContent] = useState(null);
 
-  // Validation states
+  // Templates from Firestore
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+
+  // Validation
   const [validationResult, setValidationResult] = useState(null);
   const [showValidationPanel, setShowValidationPanel] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
-  // Reviewer management states
+  // Apply fixes
+  const [isApplyingFixes, setIsApplyingFixes] = useState(false);
+  const [fixesSummary, setFixesSummary] = useState([]);
+  const [showFixesSummary, setShowFixesSummary] = useState(false);
+
+  // Reviewer management
   const [availableReviewers, setAvailableReviewers] = useState([]);
   const [selectedReviewer, setSelectedReviewer] = useState(null);
   const [assigningReviewer, setAssigningReviewer] = useState(false);
   const [reviewerError, setReviewerError] = useState("");
   const [currentReviewerName, setCurrentReviewerName] = useState(null);
 
-  // UI states
+  // UI
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
 
-  /**
-   * Fetch content from Firestore
-   * Author: Tanvir
-   * - Queries Firestore for user's content filtered by selected stage
-   * - Orders results by creation date (newest first)
-   * - Handles authentication check and error handling
-   */
-  const fetchContent = async () => {
+  // ---- Fetch templates from Firestore ----
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/templates`);
+      const data = await res.json();
+      setTemplates(data);
+
+      if (data.length > 0 && !selectedTemplateId) {
+        setSelectedTemplateId(data[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load templates:", err);
+    }
+  }, [selectedTemplateId]);
+
+  // ---- Auto-move validated items to Review ----
+  const autoMoveValidatedItems = useCallback(async (itemsList) => {
+    let itemsMoved = false;
+    try {
+      for (const item of itemsList) {
+        // If item has validation score >= 80 but is still in Draft, move it to Review
+        if (item.validation?.brandScore >= 80 && item.stage === "Draft") {
+          await updateDoc(doc(db, "content", item.id), {
+            stage: "Review",
+          });
+          itemsMoved = true;
+        }
+      }
+    } catch (err) {
+      console.error("Error auto-moving validated items:", err);
+    }
+    return itemsMoved;
+  }, []);
+
+  // ---- Fetch content ----
+  const fetchContent = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const colRef = collection(db, "content");
-
       const uid = auth.currentUser?.uid;
-
       if (!uid) {
         setError("User not authenticated.");
         setItems([]);
@@ -114,24 +134,86 @@ const Workflow = () => {
       }
 
       const q = query(
-        colRef,
+        collection(db, "content"),
         where("createdBy", "==", uid),
         where("stage", "==", selectedStage),
-        limit(50),
+        limit(50)
       );
 
       const snapshot = await getDocs(q);
-
       const results = snapshot.docs
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
-      setItems(results);
-      if (results.length > 0 && !selectedContent) {
-        setSelectedContent(results[0]);
+      // Auto-move items with score >= 80 from Draft to Review
+      if (selectedStage === "Draft") {
+        const itemsMoved = await autoMoveValidatedItems(results);
+        // If items were moved, refetch to show updated list
+        if (itemsMoved) {
+          const updatedSnapshot = await getDocs(q);
+          const updatedResults = updatedSnapshot.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+          setItems(updatedResults);
+
+          // Auto-select first item or clear if none left
+          if (updatedResults.length > 0) {
+            const refreshed = selectedContent
+              ? updatedResults.find((r) => r.id === selectedContent.id)
+              : null;
+            const next = refreshed || updatedResults[0];
+            setSelectedContent(next);
+            setValidationResult(next.validation || null);
+            setShowValidationPanel(!!next.validation);
+          } else {
+            setSelectedContent(null);
+            setValidationResult(null);
+            setShowValidationPanel(false);
+          }
+        } else {
+          setItems(results);
+          // Auto-select first item if no content is selected or prev content not in new list
+          if (selectedContent) {
+            const refreshed = results.find((r) => r.id === selectedContent.id);
+            if (refreshed) {
+              setSelectedContent(refreshed);
+              setValidationResult(refreshed.validation || null);
+              setShowValidationPanel(!!refreshed.validation);
+            } else {
+              const fallback = results[0] || null;
+              setSelectedContent(fallback);
+              setValidationResult(fallback?.validation || null);
+              setShowValidationPanel(!!fallback?.validation);
+            }
+          } else if (results.length > 0) {
+            setSelectedContent(results[0]);
+            setValidationResult(results[0].validation || null);
+            setShowValidationPanel(!!results[0].validation);
+          }
+        }
+      } else {
+        setItems(results);
+
+        if (selectedContent) {
+          //Sync with fresh Firestore results
+          const refreshed = results.find((r) => r.id === selectedContent.id);
+          if (refreshed) {
+            // Update with latest data from Firestore — this is what was missing
+            setSelectedContent(refreshed);
+            setValidationResult(refreshed.validation || null);
+            setShowValidationPanel(!!refreshed.validation);
+          } else {
+            //Item no longer in this stage (e.g. moved to Review)
+            const fallback = results[0] || null;
+            setSelectedContent(fallback);
+            setValidationResult(fallback?.validation || null);
+            setShowValidationPanel(!!fallback?.validation);
+          }
+          } else if (results.length > 0) {
+            setSelectedContent(results[0]);
+            setValidationResult(results[0].validation || null);
+            setShowValidationPanel(!!results[0].validation);
+          }
       }
     } catch (err) {
       console.error(err);
@@ -139,45 +221,61 @@ const Workflow = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStage, selectedContent, autoMoveValidatedItems]);
 
-  /**
-   * Validate selected content with backend
-   * Author: Tanvir
-   * - Sends selected content to /api/ai/validate endpoint
-   * - Receives Gemini AI analysis (compliance, brandScore, suggestions)
-   * - Updates UI with validation results and shows results panel
-   */
+  // ---- Validate content ----
   const handleValidateContent = async () => {
     if (!selectedContent) {
-      showAlert("Please select content to validate", "warning");
+      showAlert("Please select content to validate.", "warning");
       return;
     }
 
-    setLoading(true);
+    const selectedContentId = selectedContent.id;
+    const validatedAt = new Date().toISOString();
+
+    if (!selectedTemplateId) {
+      showAlert("Please select a template to validate against.", "warning");
+      return;
+    }
+
+    setIsValidating(true);
+    setFixesSummary([]);
+    setShowFixesSummary(false);
+
     try {
-      const res = await fetch("http://localhost:5000/api/ai/validate", {
+      const res = await fetch(`${API_BASE}/ai/validate`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ postId: selectedContent.id }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: selectedContentId,
+          templateId: selectedTemplateId,
+        }),
       });
 
       const data = await res.json();
-      if (data.success) {
+
+      if (!res.ok || !data.success) {
+        showAlert(data.error || "Validation failed.", "error");
+        return;
+      }
+
       setValidationResult(data.validation);
       setShowValidationPanel(true);
 
-      //DRAVEN Auto-move to Review and auto-assign reviewer when validation passes
-      if (data.validation?.compliance) {
-        const reviewers = await getAvailableReviewers(db, collection, query, getDocs);
-        const assignedReviewerId = await assignReviewerWithGemini(selectedContent, reviewers);
+      // Auto-advance to Review only if brand score >= 80
+      if (data.validation?.brandScore >= 80) {
+        const reviewers = await getAvailableReviewers(
+          db, collection, query, getDocs
+        );
+        const assignedReviewerId = await assignReviewerWithGemini(
+          selectedContent, reviewers
+        );
 
         const updatePayload = {
           stage: "Review",
           validation: data.validation,
-          validatedAt: new Date().toISOString(),
+          validatedTemplateId: selectedTemplateId,
+          validatedAt,
         };
 
         if (assignedReviewerId) {
@@ -185,32 +283,219 @@ const Workflow = () => {
           updatePayload.assignedAt = new Date().toISOString();
         }
 
-        await updateDoc(doc(db, "content", selectedContent.id), updatePayload);
+        await updateDoc(
+          doc(db, "content", selectedContentId),
+          updatePayload
+        );
+        setSelectedContent((prev) =>
+          prev ? { ...prev, ...updatePayload } : prev
+        );
 
-        setSelectedContent((prev) => (prev ? { ...prev, ...updatePayload } : prev));
-        await fetchContent();
+        // Manually fetch Review stage items to show the moved item without waiting for state update
+        try {
+          const uid = auth.currentUser?.uid;
+          const q = query(
+            collection(db, "content"),
+            where("createdBy", "==", uid),
+            where("stage", "==", "Review"),
+            limit(50)
+          );
+          const snapshot = await getDocs(q);
+          const reviewItems = snapshot.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
-        if (assignedReviewerId) {
-          showAlert("Validation passed. Stage updated to Review and reviewer assigned.", "success");
-        } else {
-          showAlert("Validation passed. Stage updated to Review, but no reviewer could be assigned.", "warning");
+          // Update state with newly moved item
+          setItems(reviewItems);
+          if (reviewItems.length > 0) {
+            const movedItem = reviewItems.find((item) => item.id === selectedContentId) || reviewItems[0];
+            setSelectedContent(movedItem);
+            setValidationResult(movedItem.validation || null);
+            setShowValidationPanel(!!movedItem.validation);
+          }
+
+          // Now switch stage
+          setSelectedStage("Review");
+        } catch (err) {
+          console.error("Error fetching Review items:", err);
         }
+
+        showAlert(
+          assignedReviewerId
+            ? "✅ Content passed! Moved to Review stage with reviewer assigned."
+            : "✅ Content passed! Moved to Review stage.",
+          "success"
+        );
+      } else {
+        // Validation complete but score < 80 — keep in Draft and store validation
+        await updateDoc(
+          doc(db, "content", selectedContentId),
+          {
+            validation: data.validation,
+            validatedTemplateId: selectedTemplateId,
+            validatedAt,
+          }
+        );
+        setSelectedContent((prev) =>
+          prev
+            ? {
+                ...prev,
+                validation: data.validation,
+                validatedTemplateId: selectedTemplateId,
+                validatedAt,
+              }
+            : prev
+        );
+        //Sync the items list so badges reflect new score immediately
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === selectedContentId
+              ? {
+                  ...item,
+                  validation: data.validation,
+                  validatedTemplateId: selectedTemplateId,
+                  validatedAt,
+                }
+              : item
+          )
+        );
+        showAlert(
+          "Content validated. Brand score is below 80. Apply fixes to improve and meet Review threshold.",
+          "warning"
+        );
       }
-    } else {
-      showAlert("Validation failed: " + data.error, "error");
+    } catch (err) {
+      console.error("Validation error:", err);
+      showAlert("Error validating content. Check your connection.", "error");
+    } finally {
+      setIsValidating(false);
     }
-  } catch (err) {
-    console.error("Validation error:", err);
-    showAlert("Error validating content", "error");
-  } finally {
-    setLoading(false);
-  }
   };
 
-  /**
-   * Fetch available reviewers from Firestore
-   * Only fetch if user is an admin
-   */
+  // ---- Apply AI fixes ----
+  const handleApplyFixes = async () => {
+    if (!selectedContent) return;
+
+    setIsApplyingFixes(true);
+    setShowFixesSummary(false);
+
+    try {
+      const res = await fetch(`${API_BASE}/ai/apply-fixes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: selectedContent.id,
+          templateId: selectedTemplateId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        showAlert(data.error || "Failed to apply fixes.", "error");
+        return;
+      }
+
+      // Update local state with the fixed content
+      setSelectedContent((prev) => ({
+        ...prev,
+        title: data.fixedTitle || prev.title,
+        text: data.fixedText || prev.text,
+      }));
+
+      // Also update the item in the list so the preview reflects changes
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === selectedContent.id
+            ? { ...item, title: data.fixedTitle || item.title, text: data.fixedText || item.text }
+            : item
+        )
+      );
+
+      setFixesSummary(data.changesSummary || []);
+      setShowFixesSummary(true);
+
+      showAlert("Fixes applied. Re-validating content…", "success");
+
+      // Auto re-validate after fixes
+      await revalidateAfterFixes();
+    } catch (err) {
+      console.error("Apply fixes error:", err);
+      showAlert("Error applying fixes.", "error");
+    } finally {
+      setIsApplyingFixes(false);
+    }
+  };
+
+  // ---- Re-validate after fixes ----
+  const revalidateAfterFixes = async () => {
+    try {
+      const selectedContentId = selectedContent.id;
+      const validatedAt = new Date().toISOString();
+
+      const res = await fetch(`${API_BASE}/ai/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: selectedContentId,
+          templateId: selectedTemplateId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setValidationResult(data.validation);
+
+        await updateDoc(doc(db, "content", selectedContentId), {
+          validation: data.validation,
+          validatedTemplateId: selectedTemplateId,
+          validatedAt,
+        });
+
+        setSelectedContent((prev) =>
+          prev
+            ? {
+                ...prev,
+                validation: data.validation,
+                validatedTemplateId: selectedTemplateId,
+                validatedAt,
+              }
+            : prev
+        );
+
+        //Sync the items list so badges update immediately without waiting for re-fetch
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === selectedContentId
+              ? {
+                  ...item,
+                  validation: data.validation,
+                  validatedTemplateId: selectedTemplateId,
+                  validatedAt,
+                }
+              : item
+          )
+        );
+
+        if (data.validation?.compliance) {
+          showAlert(
+            "Re-validation passed! Content now meets guidelines.",
+            "success"
+          );
+        } else {
+          showAlert(
+            "Content improved but still has some issues. Review the suggestions.",
+            "warning"
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Re-validation error:", err);
+    }
+  };
+
+  // ---- Fetch reviewers ----
   const fetchReviewers = async () => {
     if (!user?.uid || user?.role !== "admin") {
       setAvailableReviewers([]);
@@ -218,7 +503,9 @@ const Workflow = () => {
     }
 
     try {
-      const reviewers = await getAvailableReviewers(db, collection, query, getDocs);
+      const reviewers = await getAvailableReviewers(
+        db, collection, query, getDocs
+      );
       setAvailableReviewers(reviewers);
     } catch (err) {
       console.error("Error fetching reviewers:", err);
@@ -226,11 +513,14 @@ const Workflow = () => {
     }
   };
 
-  /**
-   * Assign a reviewer to the selected content item
-   */
+  // ---- Assign reviewer ----
   const handleAssignReviewer = async () => {
-    if (!selectedReviewer || !selectedContent || !user?.uid || user?.role !== "admin") {
+    if (
+      !selectedReviewer ||
+      !selectedContent ||
+      !user?.uid ||
+      user?.role !== "admin"
+    ) {
       setReviewerError("Please select a reviewer");
       return;
     }
@@ -239,11 +529,9 @@ const Workflow = () => {
     setReviewerError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/team/assign-reviewer", {
+      const response = await fetch(`${API_BASE}/team/assign-reviewer`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           adminId: user.uid,
           contentId: selectedContent.id,
@@ -259,8 +547,7 @@ const Workflow = () => {
 
       const data = await response.json();
       showAlert(`Reviewer assigned: ${data.reviewerName}`, "success");
-      
-      // Update the selected content to show the reviewer
+
       setSelectedContent({
         ...selectedContent,
         reviewerId: selectedReviewer,
@@ -277,23 +564,23 @@ const Workflow = () => {
     }
   };
 
-  /**
-   * Fetch content when stage changes
-   */
+  // ---- Effects ----
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
   useEffect(() => {
     fetchContent();
     setValidationResult(null);
     setShowValidationPanel(false);
-    
-    // Fetch reviewers if viewing Review stage and user is admin
+    setFixesSummary([]);
+    setShowFixesSummary(false);
+
     if (selectedStage === "Review" && user?.role === "admin") {
       fetchReviewers();
     }
   }, [selectedStage, user?.role, user?.uid]);
 
-  /**
-   * Fetch reviewer name when selectedContent changes
-   */
   useEffect(() => {
     const fetchReviewerName = async () => {
       if (!selectedContent?.reviewerId) {
@@ -302,18 +589,20 @@ const Workflow = () => {
       }
 
       try {
-        const reviewerDoc = await getDoc(doc(db, "Users", selectedContent.reviewerId));
+        const reviewerDoc = await getDoc(
+          doc(db, "Users", selectedContent.reviewerId)
+        );
         if (reviewerDoc.exists()) {
-          const reviewerData = reviewerDoc.data();
-          const reviewerName = reviewerData.firstName && reviewerData.lastName 
-            ? `${reviewerData.firstName} ${reviewerData.lastName}`
-            : reviewerData.name || reviewerData.email || "Unknown Reviewer";
-          setCurrentReviewerName(reviewerName);
+          const rd = reviewerDoc.data();
+          setCurrentReviewerName(
+            rd.firstName && rd.lastName
+              ? `${rd.firstName} ${rd.lastName}`
+              : rd.name || rd.email || "Unknown"
+          );
         } else {
-          setCurrentReviewerName("Reviewer Not Found");
+          setCurrentReviewerName("Not Found");
         }
-      } catch (error) {
-        console.error("Error fetching reviewer name:", error);
+      } catch {
         setCurrentReviewerName("Unable to Load");
       }
     };
@@ -321,11 +610,23 @@ const Workflow = () => {
     fetchReviewerName();
   }, [selectedContent?.reviewerId]);
 
+  // ---- Derived ----
+  const selectedTemplateName =
+    templates.find((t) => t.id === selectedTemplateId)?.name || "None";
+
+  const brandScoreColor =
+    validationResult?.brandScore >= 80
+      ? "#16a34a"
+      : validationResult?.brandScore >= 40
+        ? "#f59e0b"
+        : "#dc2626";
+
+  // ---- Render ----
   return (
     <div className="workflow-bg">
       <InPageAlert alertState={alertState} onClose={dismissAlert} />
       <div className="workflow-page modern">
-        {/* Header Section */}
+        {/* Header */}
         <div className="wf-header">
           <div>
             <h2 className="modern-title">Workflow</h2>
@@ -334,15 +635,16 @@ const Workflow = () => {
             </p>
           </div>
 
-          {/* Custom styled dropdown */}
           <div className="wf-stage-select">
             <span className="wf-label">Currently Viewing</span>
-
             <div className="select-wrap">
               <select
                 className="select"
                 value={selectedStage}
-                onChange={(e) => setSelectedStage(e.target.value)}
+                onChange={(e) => {
+                  setSelectedStage(e.target.value);
+                  setSelectedContent(null);
+                }}
               >
                 {STAGES.map((stage) => (
                   <option key={stage} value={stage}>
@@ -357,7 +659,7 @@ const Workflow = () => {
 
         {/* Two-column layout */}
         <div className="wf-grid">
-          {/* LEFT SIDE — Content List */}
+          {/* LEFT — Content List */}
           <section className="wf-card">
             <div className="wf-card-header">
               <div className="wf-card-title">
@@ -366,14 +668,12 @@ const Workflow = () => {
                   {selectedStage}
                 </span>
               </div>
-
               <div className="wf-card-meta">
                 {loading ? "Loading..." : `${items.length} item(s)`}
               </div>
             </div>
 
             <div className="wf-card-body">
-              {error && <div className="wf-alert wf-alert-error">{error}</div>}
               {error && <div className="wf-alert wf-alert-error">{error}</div>}
 
               {!loading && !error && items.length === 0 && (
@@ -395,9 +695,13 @@ const Workflow = () => {
                       onClick={() => {
                         setSelectedContent(item);
                         setValidationResult(item.validation || null);
-                        if (item.validation) {
-                          setShowValidationPanel(true);
+                        setShowValidationPanel(!!item.validation);
+                        // If item has validation, set the template it was validated against
+                        if (item.validatedTemplateId) {
+                          setSelectedTemplateId(item.validatedTemplateId);
                         }
+                        setFixesSummary([]);
+                        setShowFixesSummary(false);
                       }}
                     >
                       <div className="wf-item-top">
@@ -406,9 +710,22 @@ const Workflow = () => {
                           {item.stage}
                         </span>
                       </div>
-
-                      <div className="wf-item-text">{item.text}</div>
-
+                      <div className="wf-item-text">
+                        {item.text?.substring(0, 120)}
+                        {item.text?.length > 120 ? "…" : ""}
+                      </div>
+                      {item.validation && (
+                        <div className="wf-item-validation">
+                          <span className={`wf-validation-badge ${item.validation.brandScore >= 80 ? "score-high" : "score-low"}`}>
+                            {item.validation.brandScore}/100
+                          </span>
+                          {item.validation.brandScore >= 80 ? (
+                            <span className="wf-validation-status valid">✓ Ready for Review</span>
+                          ) : (
+                            <span className="wf-validation-status invalid">⚠ Needs Fixes</span>
+                          )}
+                        </div>
+                      )}
                       <div className="wf-item-footer">
                         <span className="wf-dot" />
                         <span className="wf-muted">
@@ -422,252 +739,318 @@ const Workflow = () => {
             </div>
           </section>
 
-          {/* RIGHT SIDE — Panels Container */}
+          {/* RIGHT — Panels */}
           <div className="wf-right-panels">
             {/* AI Validation Panel */}
             <aside className="wf-card validation-panel">
-            <div className="wf-card-header">
-              <div className="wf-card-title">
-                AI Content Validation
-                <span className="badge badge-ai">GEMINI</span>
-              </div>
-            </div>
-
-            <div className="wf-card-body">
-              {!showValidationPanel ? (
-                <div className="validation-setup">
-                  {/* Template Selector */}
-                  <div className="validation-section">
-                    <label className="validation-label">Select Template</label>
-                    <div className="select-wrap">
-                      <select
-                        className="select validation-select"
-                        value={selectedTemplate}
-                        onChange={(e) => setSelectedTemplate(e.target.value)}
-                      >
-                        <option value="New Product">New Product</option>
-                        <option value="Product Update">Product Update</option>
-                        <option value="Marketing Campaign">Marketing Campaign</option>
-                        <option value="Blog Post">Blog Post</option>
-                      </select>
-                      <span className="select-caret">▾</span>
-                    </div>
-                  </div>
-
-                  {/* Validate Button */}
-                  <button
-                    className="validate-btn"
-                    onClick={handleValidateContent}
-                    disabled={!selectedContent || loading}
-                  >
-                    {loading ? "Validating..." : "Validate Content"}
-                  </button>
-
-                  {/* Info Message */}
-                  <div className="validation-info">
-                    <p><strong>Select a template</strong> to validate your content against.</p>
-                    <p><strong>Click "Validate Content"</strong> to start the AI analysis.</p>
-                  </div>
-                </div>
-              ) : validationResult ? (
-                <div className="validation-results">
-                  {/* Content & Template Info */}
-                  <div className="result-header">
-                    <div className="result-info">
-                      <div className="result-content-title">{selectedContent?.title}</div>
-                      <div className="result-template">
-                        Template: <strong>{selectedTemplate}</strong>
-                      </div>
-                      <div className="result-timestamp">
-                        Last Validated: {new Date(validationResult.validatedAt).toLocaleString()}
-                      </div>
-                    </div>
-                    <button
-                      className="btn-back"
-                      onClick={() => {
-                        setShowValidationPanel(false);
-                        setValidationResult(null);
-                      }}
-                    >
-                      ← Back
-                    </button>
-                  </div>
-
-                  {/* Review Status */}
-                  <div className="review-status">
-                    <div className="status-badge">
-                      {validationResult.compliance ? (
-                        <span className="status-badge valid">
-                          ✓ Review: Content Valid
-                        </span>
-                      ) : (
-                        <span className="status-badge invalid">
-                          ⚠ Review: Needs Fixes
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Brand Consistency Score */}
-                  <div className="score-section">
-                    <div className="score-label">Brand Consistency</div>
-                    <div className="score-display">
-                      <div className="score-number">{validationResult.brandScore}</div>
-                      <div className="score-max">/100</div>
-                      <div className="score-circle">
-                        <svg viewBox="0 0 120 120">
-                          <circle
-                            cx="60"
-                            cy="60"
-                            r="54"
-                            fill="none"
-                            stroke="#e5e5e5"
-                            strokeWidth="8"
-                          />
-                          <circle
-                            cx="60"
-                            cy="60"
-                            r="54"
-                            fill="none"
-                            stroke="#7c3aed"
-                            strokeWidth="8"
-                            strokeDasharray={`${(validationResult.brandScore / 100) * 2 * Math.PI * 54} ${2 * Math.PI * 54}`}
-                            transform="rotate(-90 60 60)"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Suggestions/Fixes */}
-                  <div className="suggestions-section">
-                    <div className="suggestions-title">AI Suggestions / Fixes</div>
-                    <div className="suggestions-list">
-                      {validationResult.suggestions && validationResult.suggestions.length > 0 ? (
-                        validationResult.suggestions.map((suggestion, idx) => (
-                          <div key={idx} className="suggestion-item">
-                            <span className="suggestion-icon">●</span>
-                            <span className="suggestion-text">{suggestion}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="suggestion-item">
-                          <span className="suggestion-icon">✓</span>
-                          <span className="suggestion-text">No suggestions - content looks great!</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Apply Fixes Button */}
-                  <button className="apply-fixes-btn">Apply Fixes</button>
-
-                  {/* Validation Indicators */}
-                  <div className="validation-indicators">
-                    <div className="indicator valid">
-                      <span className="indicator-dot valid">●</span>
-                      Valid
-                    </div>
-                    <div className={`indicator ${validationResult.suggestions.length > 0 ? "active" : ""}`}>
-                      <span className={`indicator-dot ${validationResult.suggestions.length > 0 ? "warning" : ""}`}>●</span>
-                      Improvements
-                    </div>
-                    <div className={`indicator ${!validationResult.compliance ? "active" : ""}`}>
-                      <span className={`indicator-dot ${!validationResult.compliance ? "error" : ""}`}>●</span>
-                      Required Fixes
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="wf-empty">
-                  <div className="wf-empty-icon">🔍</div>
-                  <div className="wf-empty-title">No validation yet</div>
-                  <div className="wf-empty-sub">
-                    Click "Validate Content" to analyze your content
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </aside>
-
-          {/* Assign Reviewer Card — Shows only in Review stage for admins */}
-          {selectedStage === "Review" && user?.role === "admin" && selectedContent && (
-            <aside className="wf-card reviewer-card">
               <div className="wf-card-header">
                 <div className="wf-card-title">
-                  Assign Reviewer 👤
+                  AI Content Validation
+                  <span className="badge badge-ai">GEMINI</span>
                 </div>
               </div>
 
               <div className="wf-card-body">
-                <div className="reviewer-assignment">
-                  {/* Current Reviewer Status */}
-                  <div className="reviewer-section">
-                    <div className="reviewer-subtitle">Current Assignment</div>
-                    {selectedContent.reviewerId ? (
-                      <div className="reviewer-assigned">
-                        <span className="reviewer-badge">✓ Assigned</span>
-                        <div className="reviewer-id-text">{currentReviewerName} ({selectedContent.reviewerId})</div>
-                      </div>
-                    ) : (
-                      <div className="reviewer-unassigned">
-                        <span className="reviewer-badge-empty">⊘ Not Assigned</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Reviewer Selector */}
-                  <div className="reviewer-section">
-                    <label className="reviewer-label">Select Reviewer</label>
-                    {availableReviewers.length > 0 ? (
-                      <>
-                        <div className="select-wrap">
-                          <select
-                            className="select reviewer-select"
-                            value={selectedReviewer || ""}
-                            onChange={(e) => setSelectedReviewer(e.target.value)}
-                          >
-                            <option value="">Choose a reviewer...</option>
-                            {availableReviewers.map((reviewer) => (
-                              <option key={reviewer.uid} value={reviewer.uid}>
-                                {reviewer.name || reviewer.email}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="select-caret">▾</span>
-                        </div>
-
-                        <button
-                          className="assign-reviewer-btn"
-                          onClick={handleAssignReviewer}
-                          disabled={!selectedReviewer || assigningReviewer}
+                {!showValidationPanel ? (
+                  <div className="validation-setup">
+                    {/* Template selector — dynamic from Firestore */}
+                    <div className="validation-section">
+                      <label className="validation-label">
+                        Select Template
+                      </label>
+                      <div className="select-wrap">
+                        <select
+                          className="select validation-select"
+                          value={selectedTemplateId}
+                          onChange={(e) => setSelectedTemplateId(e.target.value)}
                         >
-                          {assigningReviewer ? "Assigning..." : "Assign Reviewer"}
-                        </button>
-                      </>
-                    ) : (
-                      <div className="reviewer-empty">
-                        <p>No reviewers available in your team.</p>
-                        <small>Add team members with "reviewer" role to assign reviews.</small>
+                          {templates.length === 0 && (
+                            <option value="">Loading templates…</option>
+                          )}
+                          {templates.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name || t.id}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="select-caret">▾</span>
+                      </div>
+                    </div>
+
+                    {/* Validate button */}
+                    <button
+                      className="validate-btn"
+                      onClick={handleValidateContent}
+                      disabled={!selectedContent || isValidating}
+                    >
+                      {isValidating ? (
+                        <span className="btn-loading">
+                          <span className="spinner" />
+                          Validating…
+                        </span>
+                      ) : (
+                        "Validate Content"
+                      )}
+                    </button>
+
+                    <div className="validation-info">
+                      <p>
+                        <strong>Select a template</strong> to validate your
+                        content against.
+                      </p>
+                      <p>
+                        <strong>Click "Validate Content"</strong> to start the
+                        AI analysis.
+                      </p>
+                    </div>
+                  </div>
+                ) : validationResult ? (
+                  <div className="validation-results">
+                    {/* Header */}
+                    <div className="result-header">
+                      <div className="result-info">
+                        <div className="result-content-title">
+                          {selectedContent?.title}
+                        </div>
+                        <div className="result-template">
+                          Template: <strong>{selectedTemplateName}</strong>
+                        </div>
+                        {validationResult.validatedAt && (
+                          <div className="result-timestamp">
+                            Last Validated:{" "}
+                            {new Date(validationResult.validatedAt).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="btn-back"
+                        onClick={() => {
+                          setShowValidationPanel(false);
+                          setValidationResult(null);
+                          setFixesSummary([]);
+                          setShowFixesSummary(false);
+                        }}
+                      >
+                        ← Back
+                      </button>
+                    </div>
+
+                    {/* Compliance status */}
+                    <div className="review-status">
+                      {validationResult.compliance ? (
+                        <span className="status-badge valid">
+                          ✓ Content Valid — Meets Guidelines
+                        </span>
+                      ) : (
+                        <span className="status-badge invalid">
+                          ⚠ Needs Fixes — Does Not Meet Guidelines
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Brand score */}
+                    <div className="score-section">
+                      <div className="score-label">Brand Consistency Score</div>
+                      <div className="score-display">
+                        <div className="score-number" style={{ color: brandScoreColor }}>
+                          {validationResult.brandScore}
+                        </div>
+                        <div className="score-max">/100</div>
+                        <div className="score-circle">
+                          <svg viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="54" fill="none" stroke="#e5e5e5" strokeWidth="8" />
+                            <circle
+                              cx="60" cy="60" r="54" fill="none"
+                              stroke={brandScoreColor}
+                              strokeWidth="8"
+                              strokeDasharray={`${(validationResult.brandScore / 100) * 2 * Math.PI * 54} ${2 * Math.PI * 54}`}
+                              transform="rotate(-90 60 60)"
+                              style={{ transition: "stroke-dasharray 0.6s ease" }}
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Missing sections */}
+                    {validationResult.missingSections?.length > 0 && (
+                      <div className="missing-sections">
+                        <div className="suggestions-title">Missing Required Sections</div>
+                        <div className="missing-list">
+                          {validationResult.missingSections.map((section, idx) => (
+                            <span key={idx} className="missing-tag">{section}</span>
+                          ))}
+                        </div>
                       </div>
                     )}
 
-                    {reviewerError && (
-                      <div className="reviewer-error">
-                        {reviewerError}
+                    {/* Suggestions */}
+                    <div className="suggestions-section">
+                      <div className="suggestions-title">AI Suggestions / Fixes</div>
+                      <div className="suggestions-list">
+                        {validationResult.suggestions?.length > 0 ? (
+                          validationResult.suggestions.map((suggestion, idx) => (
+                            <div key={idx} className="suggestion-item">
+                              <span className="suggestion-icon">●</span>
+                              <span className="suggestion-text">{suggestion}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="suggestion-item">
+                            <span className="suggestion-icon">✓</span>
+                            <span className="suggestion-text">
+                              No suggestions — content looks great!
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fixes summary */}
+                    {showFixesSummary && fixesSummary.length > 0 && (
+                      <div className="fixes-summary">
+                        <div className="fixes-summary-title">Changes Applied</div>
+                        <div className="fixes-summary-list">
+                          {fixesSummary.map((change, idx) => (
+                            <div key={idx} className="fix-change-item">
+                              <span className="fix-change-icon">→</span>
+                              <span className="fix-change-text">{change}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
+
+                    {/* Apply Fixes — only when not compliant */}
+                    {!validationResult.compliance && (
+                      <button
+                        className="apply-fixes-btn"
+                        onClick={handleApplyFixes}
+                        disabled={isApplyingFixes}
+                      >
+                        {isApplyingFixes ? (
+                          <span className="btn-loading">
+                            <span className="spinner" />
+                            Applying Fixes…
+                          </span>
+                        ) : (
+                          "Apply AI Fixes & Re-Validate"
+                        )}
+                      </button>
+                    )}
+
+                    {/* Re-validate if already compliant */}
+                    {validationResult.compliance && (
+                      <button
+                        className="validate-btn revalidate-btn"
+                        onClick={handleValidateContent}
+                        disabled={isValidating}
+                      >
+                        {isValidating ? "Re-Validating…" : "Re-Validate"}
+                      </button>
+                    )}
+
+                    {/* Indicators */}
+                    <div className="validation-indicators">
+                      <div className={`indicator ${validationResult.compliance ? "active" : ""}`}>
+                        <span className={`indicator-dot ${validationResult.compliance ? "valid" : ""}`}>●</span>
+                        Valid
+                      </div>
+                      <div className={`indicator ${validationResult.suggestions?.length > 0 ? "active" : ""}`}>
+                        <span className={`indicator-dot ${validationResult.suggestions?.length > 0 ? "warning" : ""}`}>●</span>
+                        Improvements
+                      </div>
+                      <div className={`indicator ${!validationResult.compliance ? "active" : ""}`}>
+                        <span className={`indicator-dot ${!validationResult.compliance ? "error" : ""}`}>●</span>
+                        Required Fixes
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="wf-empty">
+                    <div className="wf-empty-icon">🔍</div>
+                    <div className="wf-empty-title">No validation yet</div>
+                    <div className="wf-empty-sub">
+                      Click "Validate Content" to analyze your content
+                    </div>
+                  </div>
+                )}
               </div>
             </aside>
-          )}
+
+            {/* Assign Reviewer — Review stage, admins only */}
+            {selectedStage === "Review" && user?.role === "admin" && selectedContent && (
+              <aside className="wf-card reviewer-card">
+                <div className="wf-card-header">
+                  <div className="wf-card-title">Assign Reviewer 👤</div>
+                </div>
+
+                <div className="wf-card-body">
+                  <div className="reviewer-assignment">
+                    <div className="reviewer-section">
+                      <div className="reviewer-subtitle">Current Assignment</div>
+                      {selectedContent.reviewerId ? (
+                        <div className="reviewer-assigned">
+                          <span className="reviewer-badge">✓ Assigned</span>
+                          <div className="reviewer-id-text">
+                            {currentReviewerName} ({selectedContent.reviewerId})
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="reviewer-unassigned">
+                          <span className="reviewer-badge-empty">⊘ Not Assigned</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="reviewer-section">
+                      <label className="reviewer-label">Select Reviewer</label>
+                      {availableReviewers.length > 0 ? (
+                        <>
+                          <div className="select-wrap">
+                            <select
+                              className="select reviewer-select"
+                              value={selectedReviewer || ""}
+                              onChange={(e) => setSelectedReviewer(e.target.value)}
+                            >
+                              <option value="">Choose a reviewer...</option>
+                              {availableReviewers.map((reviewer) => (
+                                <option key={reviewer.uid} value={reviewer.uid}>
+                                  {reviewer.name || reviewer.email} ({reviewer.currentLoad || 0}/5)
+                                </option>
+                              ))}
+                            </select>
+                            <span className="select-caret">▾</span>
+                          </div>
+
+                          <button
+                            className="assign-reviewer-btn"
+                            onClick={handleAssignReviewer}
+                            disabled={!selectedReviewer || assigningReviewer}
+                          >
+                            {assigningReviewer ? "Assigning..." : "Assign Reviewer"}
+                          </button>
+                        </>
+                      ) : (
+                        <div className="reviewer-empty">
+                          <p>No reviewers available in your team.</p>
+                          <small>Add team members with "reviewer" role to assign reviews.</small>
+                        </div>
+                      )}
+
+                      {reviewerError && (
+                        <div className="reviewer-error">{reviewerError}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            )}
           </div>
         </div>
 
         <p className="workflow-note modern-note">
-          AI validation powered by Gemini API • Results saved to Firebase
+          AI validation powered by Gemini API
         </p>
       </div>
     </div>
