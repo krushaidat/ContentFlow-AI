@@ -14,13 +14,16 @@ import { useAuth } from "../../hooks/useAuth.js";
 const routes = [
   { key: "dashboard", label: "Dashboard", path: "/dashboard" },
   { key: "workflow", label: "Workflow", path: "/workflow" },
-  { key: "templates", label: "Templates", path: "/templates" },
+  // Abdalaa: this section stores the AI rules/guidelines used for validation.
+{ key: "templates", label: "AI Guidelines", path: "/templates" },
   { key: "calendar", label: "Calendar", path: "/calendar" },
   { key: "review", label: "Review", path: "/review", reviewerOnly: true },
   { key: "team", label: "Team", path: "/team" }
 ];
 
-const Sidebar = () => {
+// Abdalaa: on mobile i want the sidebar to slide in/out,
+// so Layout will control whether it is open.
+const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth(); // <-- Get user
@@ -36,13 +39,20 @@ const Sidebar = () => {
     setActive(getActiveKey());
   }, [location.pathname]);
 
-  const handleNavigate = (path) => {
-    navigate(path);
-  };
+// Abdalaa: when a user taps a menu item
+// I want the sidebar to close automatically.
+const handleNavigate = (path) => {
+  navigate(path);
+  if (onClose) onClose();
+};
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? "sidebar-open" : ""}`}>
       <div className="sidebar-brand">
+        {/* Abdalaa:  close button for the burger sidebar */}
+        <button className="sidebar-close-btn" onClick={onClose} type="button">
+          ×
+        </button>
         <div className="brand-title">ContentFlow AI</div>
       </div>
 
@@ -52,9 +62,11 @@ const Sidebar = () => {
           .map((r) => {
             const labelKey = r.label.toLowerCase();
             let icon = null;
+            // Abdalaa: keep the old templates icon for AI Guidelines too,
+            // since this section was renamed but still needs the same sidebar image.
             if (labelKey.includes("dash")) icon = dashboardIcon;
             else if (labelKey.includes("work")) icon = workflowIcon;
-            else if (labelKey.includes("templates")) icon = templatesIcon;
+            else if (labelKey.includes("templates") || labelKey.includes("guideline")) icon = templatesIcon;
             else if (labelKey.includes("calendar")) icon = toolsIcon;
             else if (labelKey.includes("review")) icon = projectsIcon;
             else if (labelKey.includes("team")) icon = teamIcon;

@@ -565,7 +565,7 @@ const handleUploadContentToDrive = async (item) => {
           </div>
           <div className="dashboard-card-body">
             <div className="dashboard-card-title">Create Content</div>
-            <div className="dashboard-card-desc">Start a new post. Choose a template and write your content.</div>
+            <div className="dashboard-card-desc">Start a new post and write your content.</div>
             <div className="dashboard-create-actions">
               <button className="dashboard-card-btn" onClick={() => setIsModalOpen(true)}>
                 + Create Content
@@ -585,11 +585,12 @@ const handleUploadContentToDrive = async (item) => {
             <span role="img" aria-label="Templates" style={{fontSize: 32}}>📄</span>
           </div>
           <div className="dashboard-card-body">
-            <div className="dashboard-card-title">Guidelines</div>
-            <div className="dashboard-card-desc">Manage and modify guidelines to ensure brand consistency.</div>
+          <div className="dashboard-card-title">AI Guidelines</div>
+          <div className="dashboard-card-desc">
+            Manage AI validation guidelines used to check content quality and brand consistency.
+          </div>
             <button className="dashboard-card-btn secondary" onClick={handleManageTemplates}>
-              Manage Guidelines
-            </button>
+            Manage AI Guidelines            </button>
           </div>
         </div>
       </div>

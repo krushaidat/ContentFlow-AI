@@ -3,7 +3,30 @@
   min-height: 100vh;
   background: #f5f3ff;
 }
-
+/* Abdalaa: burger button stays hidden on desktop
+   and only appears on smaller screens */
+   .burger-btn {
+    display: none;
+    position: fixed;
+    top: 18px;
+    left: 18px;
+    z-index: 80;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 12px;
+    background: white;
+    color: #6d28d9;
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(124, 58, 237, 0.15);
+  }
+  
+  /* Abdalaa: dark background behind sidebar when open on mobile */
+  .sidebar-overlay {
+    display: none;
+  }
 .sidebar {
   position: fixed;
   left: 0;
@@ -23,6 +46,18 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+/* Abdalaa: close button is only for mobile sidebar mode */
+.sidebar-close-btn {
+  display: none;
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  font-size: 28px;
+  line-height: 1;
+  color: #6d28d9;
+  cursor: pointer;
 }
 
 .brand-logo-placeholder {
@@ -364,22 +399,59 @@
 }
 
 @media (max-width: 720px) {
-  .sidebar {
-    position: relative;
-    width: 100%;
-    height: auto;
-    bottom: auto;
+  .burger-btn {
+    display: block;
   }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    z-index: 65;
+  }
+
+  .sidebar {
+    width: 280px;
+    max-width: 82vw;
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+    z-index: 70;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-close-btn {
+    display: block;
+  }
+
+  .sidebar-brand {
+    justify-content: space-between;
+  }
+
   .main-area {
     margin-left: 0;
   }
+
   .topbar {
-    left: 12px;
-    right: 12px;
-    margin-top: 12px;
-    border-radius: 12px;
+    left: 0;
+    right: 0;
+    margin-top: 0;
+    border-radius: 0;
+    padding-left: 72px;
   }
+
   .content-area {
-    margin-top: 140px;
+    margin-top: 88px;
+    padding: 18px;
+  }
+
+  .sidebar-bottom {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: 20px;
   }
 }
