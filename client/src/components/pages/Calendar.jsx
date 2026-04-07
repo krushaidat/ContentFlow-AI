@@ -36,7 +36,9 @@ const [currentDate, setCurrentDate] = useState(new Date());
 // I want to store it here so I can edit or delete it.
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  // Handle notification highlight on arrival
+  /* Aminah update: Handle notification highlight on arrival 
+     and clear it after 5 seconds 
+  */
   useEffect(() => {
     const targetId = location.state?.highlightContentId;
     if (!targetId) return;
@@ -281,6 +283,8 @@ const handleDeleteScheduledEvent = async () => {
         await Promise.all(deletions);
       }
     }
+
+    // Aminah update: Clear highlighted event if it matches the deleted event
 
     if (highlightedEventId === selectedEvent.id || highlightedEventId === selectedEvent.postId) {
       setHighlightedEventId(null);

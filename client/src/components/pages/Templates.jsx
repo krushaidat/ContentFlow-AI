@@ -160,6 +160,10 @@ export default function TemplatesPage() {
       return compareByName(a, b);
     }
 
+    /* Aminah update: added option to sort by oldest first
+      - Sorts templates by their creation or last updated date in ascending order (oldest first).
+    */
+
     if (sortBy === "oldest") {
       const recencyDiff = getTemplateRecency(a) - getTemplateRecency(b);
       if (recencyDiff !== 0) return recencyDiff;

@@ -631,7 +631,7 @@ const Workflow = () => {
                             <option value="">Choose a reviewer...</option>
                             {availableReviewers.map((reviewer) => (
                               <option key={reviewer.uid} value={reviewer.uid}>
-                                {reviewer.name || reviewer.email} ({reviewer.currentLoad || 0}/5)
+                                {reviewer.name || reviewer.email}
                               </option>
                             ))}
                           </select>

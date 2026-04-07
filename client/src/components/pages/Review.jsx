@@ -19,13 +19,17 @@ const ReviewPage = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-  // Aminah updated: state for version history panel inside the review modal — which snapshot is selected, whether the panel is visible, and view vs compare mode.
   const [selectedVersionIndex, setSelectedVersionIndex] = useState(-1);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [versionViewMode, setVersionViewMode] = useState('view');
   const [highlightedContentId, setHighlightedContentId] = useState(null);
   const location = useLocation();
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
+
+
+  /* Aminah updated: added state for version history panel inside the review modal 
+    — which snapshot is selected, whether the panel is visible, and view vs compare mode. 
+  */
 
   // Handle notification highlight on arrival
   useEffect(() => {
