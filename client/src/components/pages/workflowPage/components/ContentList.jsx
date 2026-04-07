@@ -89,7 +89,7 @@ const ContentList = ({
                       <div className="wf-item-validation">
                         <span
                           className={`wf-score-chip ${
-                            brandScore >= 90
+                            brandScore >= 80
                               ? "score-high"
                               : brandScore >= 60
                                 ? "score-mid"
@@ -98,7 +98,7 @@ const ContentList = ({
                         >
                           {brandScore}/100
                         </span>
-                        {brandScore >= 90 ? (
+                        {brandScore >= 80 ? (
                           <span className="wf-status-tag valid">✓ Ready</span>
                         ) : (
                           <span className="wf-status-tag invalid">⚠ Needs Fixes</span>

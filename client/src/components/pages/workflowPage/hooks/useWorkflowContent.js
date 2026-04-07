@@ -27,7 +27,7 @@ export const useWorkflowContent = () => {
     let itemsMoved = false;
     try {
       for (const item of itemsList) {
-        if (item.validation?.brandScore >= 90 && item.stage === "Draft") {
+        if (item.validation?.brandScore >= 80 && item.stage === "Draft") {
           await updateDoc(doc(db, "content", item.id), {
             stage: "Review",
           });
@@ -66,7 +66,7 @@ export const useWorkflowContent = () => {
           .map((d) => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
-        // Auto-move items with score >= 90 from Draft to Review
+        // Auto-move items with score >= 80 from Draft to Review
         if (stageToFetch === "Draft") {
           const itemsMoved = await autoMoveValidatedItems(results);
           if (itemsMoved) {

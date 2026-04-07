@@ -141,7 +141,7 @@ const Workflow = () => {
       showAlert,
     );
 
-    if (validation?.brandScore >= 90) {
+    if (validation?.brandScore >= 80) {
       const reviewers = await getAvailableReviewers(
         db,
         collection,
@@ -207,7 +207,7 @@ const Workflow = () => {
       );
     } else if (validation) {
       showAlert(
-        "Content validated. Brand score is below 90. Apply fixes to improve and meet Review threshold.",
+        "Content validated. Brand score is below 80. Apply fixes to improve and meet Review threshold.",
         "warning",
       );
     }
