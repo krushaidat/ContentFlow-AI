@@ -13,7 +13,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const validationSchema = {
   type: SchemaType.OBJECT,
   properties: {
-    compliance: { type: SchemaType.BOOLEAN, description: "true if brandScore >= 70 and no missing sections" },
+    compliance: { type: SchemaType.BOOLEAN, description: "true if brandScore >= 80 and no missing sections" },
     brandScore: { type: SchemaType.INTEGER, description: "0-100 brand consistency score" },
     missingSections: {
       type: SchemaType.ARRAY,
@@ -71,7 +71,7 @@ const schedulingSchema = {
   required: ["suggestedDate", "suggestedTime", "reason"],
 };
 
-function createModel(schema, maxTokens = 1024) {
+function createModel(schema, maxTokens = 2048) {
   return genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     generationConfig: {

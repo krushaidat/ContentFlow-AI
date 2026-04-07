@@ -106,8 +106,8 @@ const Workflow = () => {
     let itemsMoved = false;
     try {
       for (const item of itemsList) {
-        // If item has validation score >= 90 but is still in Draft, move it to Review
-        if (item.validation?.brandScore >= 90 && item.stage === "Draft") {
+        // If item has validation score >= 80 but is still in Draft, move it to Review
+        if (item.validation?.brandScore >= 80 && item.stage === "Draft") {
           await updateDoc(doc(db, "content", item.id), {
             stage: "Review",
           });
@@ -145,7 +145,7 @@ const Workflow = () => {
         .map((d) => ({ id: d.id, ...d.data() }))
         .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
-      // Auto-move items with score >= 90 from Draft to Review
+      // Auto-move items with score >= 80 from Draft to Review
       if (selectedStage === "Draft") {
         const itemsMoved = await autoMoveValidatedItems(results);
         // If items were moved, refetch to show updated list
@@ -158,9 +158,13 @@ const Workflow = () => {
 
           // Auto-select first item or clear if none left
           if (updatedResults.length > 0) {
-            setSelectedContent(updatedResults[0]);
-            setValidationResult(updatedResults[0].validation || null);
-            setShowValidationPanel(!!updatedResults[0].validation);
+            const refreshed = selectedContent
+              ? updatedResults.find((r) => r.id === selectedContent.id)
+              : null;
+            const next = refreshed || updatedResults[0];
+            setSelectedContent(next);
+            setValidationResult(next.validation || null);
+            setShowValidationPanel(!!next.validation);
           } else {
             setSelectedContent(null);
             setValidationResult(null);
@@ -169,33 +173,47 @@ const Workflow = () => {
         } else {
           setItems(results);
           // Auto-select first item if no content is selected or prev content not in new list
-          if (!selectedContent || !results.find((r) => r.id === selectedContent.id)) {
-            if (results.length > 0) {
-              setSelectedContent(results[0]);
-              setValidationResult(results[0].validation || null);
-              setShowValidationPanel(!!results[0].validation);
+          if (selectedContent) {
+            const refreshed = results.find((r) => r.id === selectedContent.id);
+            if (refreshed) {
+              setSelectedContent(refreshed);
+              setValidationResult(refreshed.validation || null);
+              setShowValidationPanel(!!refreshed.validation);
             } else {
-              setSelectedContent(null);
-              setValidationResult(null);
-              setShowValidationPanel(false);
+              const fallback = results[0] || null;
+              setSelectedContent(fallback);
+              setValidationResult(fallback?.validation || null);
+              setShowValidationPanel(!!fallback?.validation);
             }
+          } else if (results.length > 0) {
+            setSelectedContent(results[0]);
+            setValidationResult(results[0].validation || null);
+            setShowValidationPanel(!!results[0].validation);
           }
         }
       } else {
         setItems(results);
 
-        // Auto-select first item if no content is selected or prev content not in new list
-        if (!selectedContent || !results.find((r) => r.id === selectedContent.id)) {
-          if (results.length > 0) {
+        if (selectedContent) {
+          //Sync with fresh Firestore results
+          const refreshed = results.find((r) => r.id === selectedContent.id);
+          if (refreshed) {
+            // Update with latest data from Firestore — this is what was missing
+            setSelectedContent(refreshed);
+            setValidationResult(refreshed.validation || null);
+            setShowValidationPanel(!!refreshed.validation);
+          } else {
+            //Item no longer in this stage (e.g. moved to Review)
+            const fallback = results[0] || null;
+            setSelectedContent(fallback);
+            setValidationResult(fallback?.validation || null);
+            setShowValidationPanel(!!fallback?.validation);
+          }
+          } else if (results.length > 0) {
             setSelectedContent(results[0]);
             setValidationResult(results[0].validation || null);
             setShowValidationPanel(!!results[0].validation);
-          } else {
-            setSelectedContent(null);
-            setValidationResult(null);
-            setShowValidationPanel(false);
           }
-        }
       }
     } catch (err) {
       console.error(err);
@@ -212,6 +230,9 @@ const Workflow = () => {
       return;
     }
 
+    const selectedContentId = selectedContent.id;
+    const validatedAt = new Date().toISOString();
+
     if (!selectedTemplateId) {
       showAlert("Please select a template to validate against.", "warning");
       return;
@@ -226,7 +247,7 @@ const Workflow = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          postId: selectedContent.id,
+          postId: selectedContentId,
           templateId: selectedTemplateId,
         }),
       });
@@ -241,8 +262,8 @@ const Workflow = () => {
       setValidationResult(data.validation);
       setShowValidationPanel(true);
 
-      // Auto-advance to Review only if brand score >= 90
-      if (data.validation?.brandScore >= 90) {
+      // Auto-advance to Review only if brand score >= 80
+      if (data.validation?.brandScore >= 80) {
         const reviewers = await getAvailableReviewers(
           db, collection, query, getDocs
         );
@@ -254,7 +275,7 @@ const Workflow = () => {
           stage: "Review",
           validation: data.validation,
           validatedTemplateId: selectedTemplateId,
-          validatedAt: new Date().toISOString(),
+          validatedAt,
         };
 
         if (assignedReviewerId) {
@@ -263,7 +284,7 @@ const Workflow = () => {
         }
 
         await updateDoc(
-          doc(db, "content", selectedContent.id),
+          doc(db, "content", selectedContentId),
           updatePayload
         );
         setSelectedContent((prev) =>
@@ -287,7 +308,7 @@ const Workflow = () => {
           // Update state with newly moved item
           setItems(reviewItems);
           if (reviewItems.length > 0) {
-            const movedItem = reviewItems.find((item) => item.id === selectedContent.id) || reviewItems[0];
+            const movedItem = reviewItems.find((item) => item.id === selectedContentId) || reviewItems[0];
             setSelectedContent(movedItem);
             setValidationResult(movedItem.validation || null);
             setShowValidationPanel(!!movedItem.validation);
@@ -306,13 +327,13 @@ const Workflow = () => {
           "success"
         );
       } else {
-        // Validation complete but score < 90 — keep in Draft and store validation
+        // Validation complete but score < 80 — keep in Draft and store validation
         await updateDoc(
-          doc(db, "content", selectedContent.id),
+          doc(db, "content", selectedContentId),
           {
             validation: data.validation,
             validatedTemplateId: selectedTemplateId,
-            validatedAt: new Date().toISOString(),
+            validatedAt,
           }
         );
         setSelectedContent((prev) =>
@@ -321,12 +342,25 @@ const Workflow = () => {
                 ...prev,
                 validation: data.validation,
                 validatedTemplateId: selectedTemplateId,
-                validatedAt: new Date().toISOString(),
+                validatedAt,
               }
             : prev
         );
+        //Sync the items list so badges reflect new score immediately
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === selectedContentId
+              ? {
+                  ...item,
+                  validation: data.validation,
+                  validatedTemplateId: selectedTemplateId,
+                  validatedAt,
+                }
+              : item
+          )
+        );
         showAlert(
-          "Content validated. Brand score is below 90. Apply fixes to improve and meet Review threshold.",
+          "Content validated. Brand score is below 80. Apply fixes to improve and meet Review threshold.",
           "warning"
         );
       }
@@ -396,11 +430,14 @@ const Workflow = () => {
   // ---- Re-validate after fixes ----
   const revalidateAfterFixes = async () => {
     try {
+      const selectedContentId = selectedContent.id;
+      const validatedAt = new Date().toISOString();
+
       const res = await fetch(`${API_BASE}/ai/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          postId: selectedContent.id,
+          postId: selectedContentId,
           templateId: selectedTemplateId,
         }),
       });
@@ -409,6 +446,37 @@ const Workflow = () => {
 
       if (data.success) {
         setValidationResult(data.validation);
+
+        await updateDoc(doc(db, "content", selectedContentId), {
+          validation: data.validation,
+          validatedTemplateId: selectedTemplateId,
+          validatedAt,
+        });
+
+        setSelectedContent((prev) =>
+          prev
+            ? {
+                ...prev,
+                validation: data.validation,
+                validatedTemplateId: selectedTemplateId,
+                validatedAt,
+              }
+            : prev
+        );
+
+        //Sync the items list so badges update immediately without waiting for re-fetch
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === selectedContentId
+              ? {
+                  ...item,
+                  validation: data.validation,
+                  validatedTemplateId: selectedTemplateId,
+                  validatedAt,
+                }
+              : item
+          )
+        );
 
         if (data.validation?.compliance) {
           showAlert(
@@ -547,7 +615,7 @@ const Workflow = () => {
     templates.find((t) => t.id === selectedTemplateId)?.name || "None";
 
   const brandScoreColor =
-    validationResult?.brandScore >= 70
+    validationResult?.brandScore >= 80
       ? "#16a34a"
       : validationResult?.brandScore >= 40
         ? "#f59e0b"
@@ -648,10 +716,10 @@ const Workflow = () => {
                       </div>
                       {item.validation && (
                         <div className="wf-item-validation">
-                          <span className={`wf-validation-badge ${item.validation.brandScore >= 90 ? "score-high" : "score-low"}`}>
+                          <span className={`wf-validation-badge ${item.validation.brandScore >= 80 ? "score-high" : "score-low"}`}>
                             {item.validation.brandScore}/100
                           </span>
-                          {item.validation.brandScore >= 90 ? (
+                          {item.validation.brandScore >= 80 ? (
                             <span className="wf-validation-status valid">✓ Ready for Review</span>
                           ) : (
                             <span className="wf-validation-status invalid">⚠ Needs Fixes</span>

@@ -35,7 +35,7 @@ function isValidTransition(currentStage, targetStage) {
   // Both stages must exist in the array
   if (currentIndex === -1 || targetIndex === -1) return false;
 
-  // Target must be the next stage (index + 1)
+  // Target must be the  (index + 1)
   return targetIndex === currentIndex + 1;
 }
 

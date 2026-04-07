@@ -141,7 +141,7 @@ const Workflow = () => {
       showAlert,
     );
 
-    if (validation?.brandScore >= 90) {
+    if (validation?.brandScore >= 80) {
       const reviewers = await getAvailableReviewers(
         db,
         collection,
@@ -206,8 +206,17 @@ const Workflow = () => {
         "success",
       );
     } else if (validation) {
+      //DRAVEN Sync updated validation into array
+      setItems((prev) =>
+        prev.map((item)=>
+        item.id === selectedContent.id
+          ? { ...item, validation }
+          : item
+        )
+      );
+      setSelectedContent((prev)=> prev ? { ...prev, validation } : prev);
       showAlert(
-        "Content validated. Brand score is below 90. Apply fixes to improve and meet Review threshold.",
+        "Content validated. Brand score is below 80. Apply fixes to improve and meet Review threshold.",
         "warning",
       );
     }
@@ -252,7 +261,15 @@ const Workflow = () => {
       );
       if (revalidation) {
         setValidationResult(revalidation);
-      }
+        // Keep items in sync so badges reflect latest score
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === selectedContent.id
+              ? { ...item, validation: revalidation }
+              : item
+          )
+        );
+     }
     }
   };
 
@@ -282,12 +299,15 @@ const Workflow = () => {
   };
 
   const handleSelectContent = (item) => {
-    setSelectedContent(item);
+    //DRAVEN Use freshest version from array
+    const freshItem = items.find((i) => i.id === item.id) || item;
+
+    setSelectedContent(freshItem);
     setSelectedReviewer(null);
-    setValidationResult(item.validation || null);
-    setShowValidationPanel(!!item.validation);
-    if (item.validatedTemplateId) {
-      setSelectedTemplateId(item.validatedTemplateId);
+    setValidationResult(freshItem.validation || null);
+    setShowValidationPanel(!!freshItem.validation);
+    if (freshItem.validatedTemplateId) {
+      setSelectedTemplateId(freshItem.validatedTemplateId);
     }
     setShowFixesSummary(false);
   };

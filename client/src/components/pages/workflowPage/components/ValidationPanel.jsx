@@ -22,7 +22,7 @@ const ValidationPanel = ({
   onTemplateChange,
 }) => {
   const brandScoreColor =
-    validationResult?.brandScore >= 70
+    validationResult?.brandScore >= 80
       ? "#16a34a"
       : validationResult?.brandScore >= 40
         ? "#f59e0b"
