@@ -23,7 +23,7 @@ const ContentViewModal = ({ content, onClose }) => {
             </span>
             {hasValidation && (
               <span
-                className={`cv-score-pill ${brandScore >= 90 ? "score-high" : brandScore >= 60 ? "score-mid" : "score-low"}`}
+                className={`cv-score-pill ${brandScore >= 80 ? "score-high" : brandScore >= 60 ? "score-mid" : "score-low"}`}
               >
                 {brandScore}/100
               </span>
@@ -70,7 +70,7 @@ const ContentViewModal = ({ content, onClose }) => {
                 <div className="cv-val-item">
                   <span className="cv-val-label">Brand Score</span>
                   <span
-                    className={`cv-val-value ${brandScore >= 90 ? "text-green" : brandScore >= 60 ? "text-amber" : "text-red"}`}
+                    className={`cv-val-value ${brandScore >= 80 ? "text-green" : brandScore >= 60 ? "text-amber" : "text-red"}`}
                   >
                     {brandScore}/100
                   </span>
