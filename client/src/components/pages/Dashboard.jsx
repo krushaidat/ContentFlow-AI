@@ -138,6 +138,7 @@ const handleManualScheduleSubmit = async () => {
   const [historyVersionIndex, setHistoryVersionIndex] = useState(-1);
   const [historyViewMode, setHistoryViewMode] = useState("view");
   const [isRevertingHistory, setIsRevertingHistory] = useState(false);
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false);
   const [pendingHighlightId, setPendingHighlightId] = useState(null);
   const [highlightedContentId, setHighlightedContentId] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -376,7 +377,17 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
     const history = Array.isArray(item.versionHistory) ? item.versionHistory : [];
     setHistoryVersionIndex(history.length > 0 ? history.length - 1 : -1);
     setHistoryViewMode("view");
+    setShowRevertConfirm(false);
     setHistoryItem(item);
+  };
+  
+  // Aminah update: open the content version history modal in compare mode, which highlights field changes between the selected snapshot and the current version.
+
+  const closeHistoryModal = () => {
+    setHistoryItem(null);
+    setHistoryVersionIndex(-1);
+    setHistoryViewMode("view");
+    setShowRevertConfirm(false);
   };
 
   // Aminah updated: format a versionHistory snapshotAt timestamp into a readable locale string.
@@ -390,7 +401,7 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
   const historyFieldChanged = (snapshot, field, current) =>
     (snapshot?.[field] || "") !== (current?.[field] || "");
 
-  const handleRevertHistoryVersion = async () => {
+  const handleRevertHistoryVersion = () => {
     const history = Array.isArray(historyItem?.versionHistory)
       ? historyItem.versionHistory
       : [];
@@ -404,15 +415,27 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
       return;
     }
 
-    const confirmRevert = window.confirm(
-      `Revert this content to version v${historyVersionIndex + 1}?`
-    );
+  // Aminah updated: when the user clicks "Revert to this version", show a confirmation popup before actually reverting, to prevent accidental reverts.
+    setShowRevertConfirm(true);
+  };
 
-    if (!confirmRevert) {
+  const confirmRevertHistoryVersion = async () => {
+    const history = Array.isArray(historyItem?.versionHistory)
+      ? historyItem.versionHistory
+      : [];
+    const selectedSnapshot =
+      historyVersionIndex >= 0 && historyVersionIndex < history.length
+        ? history[historyVersionIndex]
+        : null;
+
+    if (!historyItem || !selectedSnapshot || !user?.uid) {
+      setShowRevertConfirm(false);
+      showAlert("Select a saved version to revert to first.", "warning");
       return;
     }
 
     try {
+      setShowRevertConfirm(false);
       setIsRevertingHistory(true);
 
       const response = await fetch("http://localhost:5000/api/team/content-update", {
@@ -435,9 +458,7 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
       }
 
       await fetchContent(user);
-      setHistoryItem(null);
-      setHistoryVersionIndex(-1);
-      setHistoryViewMode("view");
+      closeHistoryModal();
       showAlert(
         data.assignedReviewerId
           ? "Version reverted successfully and reviewer assignment was restored."
@@ -1179,11 +1200,11 @@ const handleUploadContentToDrive = async (item) => {
             : null;
 
         return (
-          <div className="modal-overlay" onClick={() => setHistoryItem(null)}>
+          <div className="modal-overlay" onClick={closeHistoryModal}>
             <div className="modal-content history-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h3>Version History</h3>
-                <button className="modal-close" onClick={() => setHistoryItem(null)}>×</button>
+                <button className="modal-close" onClick={closeHistoryModal}>×</button>
               </div>
               <div className="modal-body">
                 <p style={{ marginBottom: 12 }}>
@@ -1199,14 +1220,20 @@ const handleUploadContentToDrive = async (item) => {
                       <button
                         type="button"
                         className={`history-toggle-btn ${historyViewMode === "view" ? "active" : ""}`}
-                        onClick={() => setHistoryViewMode("view")}
+                        onClick={() => {
+                          setHistoryViewMode("view");
+                          setShowRevertConfirm(false);
+                        }}
                       >
                         View version
                       </button>
                       <button
                         type="button"
                         className={`history-toggle-btn ${historyViewMode === "compare" ? "active" : ""}`}
-                        onClick={() => setHistoryViewMode("compare")}
+                        onClick={() => {
+                          setHistoryViewMode("compare");
+                          setShowRevertConfirm(false);
+                        }}
                       >
                         Compare
                       </button>
@@ -1218,6 +1245,7 @@ const handleUploadContentToDrive = async (item) => {
                     onChange={(e) => {
                       setHistoryVersionIndex(Number(e.target.value));
                       setHistoryViewMode("view");
+                      setShowRevertConfirm(false);
                     }}
                   >
                     <option value={-1}>Current version only</option>
@@ -1295,14 +1323,38 @@ const handleUploadContentToDrive = async (item) => {
               <div className="modal-footer" style={{ justifyContent: "space-between", gap: 12 }}>
                 <button
                   type="button"
-                  className="btn-save"
+                  className="btn-warning"
                   onClick={handleRevertHistoryVersion}
                   disabled={!selectedSnapshot || isRevertingHistory}
                 >
                   {isRevertingHistory ? "Reverting..." : "Revert to this version"}
                 </button>
-                <button className="btn-secondary" onClick={() => setHistoryItem(null)}>Close</button>
+                <button className="btn-secondary" onClick={closeHistoryModal}>Close</button>
               </div>
+
+              {showRevertConfirm && selectedSnapshot && (
+                <div className="history-confirm-overlay" onClick={() => setShowRevertConfirm(false)}>
+                  <div className="history-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                    <h4>Revert to version v{historyVersionIndex + 1}?</h4>
+                    <p>
+                      This will replace the current title, stage, and text with the selected saved version.
+                    </p>
+                    <div className="history-confirm-actions">
+                      <button type="button" className="btn-cancel" onClick={() => setShowRevertConfirm(false)}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-warning"
+                        onClick={confirmRevertHistoryVersion}
+                        disabled={isRevertingHistory}
+                      >
+                        {isRevertingHistory ? "Reverting..." : "Yes, revert version"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
