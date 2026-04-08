@@ -942,3 +942,22 @@
 .btn-create:active {
   transform: scale(0.98);
 }
+
+/* ========== Notification Glow Animation ========== */
+/* Aminah update: Added keyframes for orange glow effect and a class to apply it to notifications */
+
+@keyframes orange-glow {
+  0% {
+    box-shadow: 0 0 0 2px #f97316;
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 2px #f97316;
+  }
+}
+
+.notification-highlight {
+  animation: orange-glow 5s ease-in-out 1;
+}

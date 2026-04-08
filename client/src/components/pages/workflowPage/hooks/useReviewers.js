@@ -28,7 +28,8 @@ export const useReviewers = () => {
         db,
         collection,
         query,
-        getDocs
+        getDocs,
+        user?.teamId || null
       );
       setAvailableReviewers(reviewers);
     } catch (err) {

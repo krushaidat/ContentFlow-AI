@@ -41,7 +41,7 @@ import ValidationPanel from "./components/ValidationPanel";
 import ReviewerCard from "./components/ReviewerCard";
 
 // Constants
-import { STAGES } from "./constants";
+import { API_BASE, STAGES } from "./constants";
 
 // Styles
 import "../../styles/workflow.css";
@@ -174,6 +174,7 @@ const Workflow = () => {
         collection,
         query,
         getDocs,
+        user?.teamId || null,
       );
       const assignedReviewerId = await assignReviewerWithGemini(
         selectedContent,
@@ -188,10 +189,29 @@ const Workflow = () => {
       };
 
       if (assignedReviewerId) {
-        updatePayload.suggestedReviewerId = assignedReviewerId;
+        updatePayload.reviewerId = assignedReviewerId;
+        updatePayload.assignedAt = new Date().toISOString();
+        updatePayload.assignedBy = user?.uid || selectedContent?.createdBy || "system";
       }
 
       await updateDoc(doc(db, "content", selectedContent.id), updatePayload);
+
+      if (assignedReviewerId && user?.role === "admin" && user?.teamId) {
+        try {
+          await fetch(`${API_BASE}/team/assign-reviewer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              adminId: user.uid,
+              contentId: selectedContent.id,
+              reviewerId: assignedReviewerId,
+              teamId: user.teamId,
+            }),
+          });
+        } catch (assignError) {
+          console.error("Error confirming automatic reviewer assignment:", assignError);
+        }
+      }
       setSelectedContent((prev) =>
         prev ? { ...prev, ...updatePayload } : prev,
       );
@@ -228,7 +248,7 @@ const Workflow = () => {
 
       showAlert(
         assignedReviewerId
-          ? "Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
+          ? "Content passed! Moved to Review stage with a reviewer assigned automatically."
           : "Content passed! Moved to Review stage.",
         "success",
       );

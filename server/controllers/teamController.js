@@ -2,6 +2,70 @@ const { db } = require("../config/firebase");
 const admin = require("firebase-admin");
 const { createNotification, buildDisplayName } = require("../utils/notificationService");
 
+const normalizeStageValue = (value) => String(value || "").trim().toLowerCase();
+
+async function findAutoReviewerForTeam(teamId, excludeUserId = null) {
+  if (!teamId) {
+    return null;
+  }
+
+  const teamUsersSnapshot = await db
+    .collection("Users")
+    .where("teamId", "==", teamId)
+    .get();
+
+  const reviewers = teamUsersSnapshot.docs
+    .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
+    .filter(
+      (member) => member.id !== excludeUserId && member.role === "reviewer"
+    );
+
+  if (reviewers.length === 0) {
+    return null;
+  }
+
+  const availableReviewers = reviewers.filter(
+    (reviewer) => reviewer.isAvailable !== false
+  );
+  const reviewerPool = availableReviewers.length > 0 ? availableReviewers : reviewers;
+
+  const reviewersWithLoad = await Promise.all(
+    reviewerPool.map(async (reviewer) => {
+      const assignedSnapshot = await db
+        .collection("content")
+        .where("reviewerId", "==", reviewer.id)
+        .get();
+
+      const currentLoad = assignedSnapshot.docs.filter((contentDoc) => {
+        const assignedContent = contentDoc.data() || {};
+        const assignedStage = normalizeStageValue(assignedContent.stage);
+        const reviewStatus = normalizeStageValue(assignedContent.reviewStatus);
+
+        return (
+          assignedStage === "review" ||
+          assignedStage === "update" ||
+          !["approved", "rejected"].includes(reviewStatus)
+        );
+      }).length;
+
+      return {
+        ...reviewer,
+        currentLoad,
+      };
+    })
+  );
+
+  reviewersWithLoad.sort((a, b) => {
+    const loadDiff = Number(a.currentLoad || 0) - Number(b.currentLoad || 0);
+    if (loadDiff !== 0) {
+      return loadDiff;
+    }
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  return reviewersWithLoad[0] || null;
+}
+
 /**
  * addMemberToTeam - Server-side team member addition
  * Only allows admins to add members to their team
@@ -358,34 +422,38 @@ exports.submitReviewDecision = async (req, res) => {
       if (decision === "approved") {
         await createNotification({
           recipientId: creatorId,
-          type: "ready_to_post",
+          type: "review_approved",
           title: "Content Approved",
           message: `${reviewerName} approved \"${contentTitle}\". It's now ready to post.`,
           contentId,
           actorId: reviewerId,
-          eventKey: `ready_to_post_${contentId}_${reviewerId}_${updatePayload.reviewedAt}`,
+          eventKey: `review_approved_${contentId}_${reviewerId}_${updatePayload.reviewedAt}`,
           dedupe: false,
           metadata: {
             contentTitle,
             reviewStatus: decision,
             reviewedAt: updatePayload.reviewedAt,
+            actionRoute: "/dashboard",
+            actionLabel: "Go to content",
           },
         });
       } else {
         await createNotification({
           recipientId: creatorId,
-          type: "content_rejected",
+          type: "review_rejected",
           title: "Changes Requested",
           message: `${reviewerName} requested updates for \"${contentTitle}\".`,
           contentId,
           actorId: reviewerId,
-          eventKey: `content_rejected_${contentId}_${reviewerId}_${updatePayload.reviewedAt}`,
+          eventKey: `review_rejected_${contentId}_${reviewerId}_${updatePayload.reviewedAt}`,
           dedupe: false,
           metadata: {
             contentTitle,
             reviewStatus: decision,
             rejectionReason: String(rejectionReason || "").trim(),
             reviewedAt: updatePayload.reviewedAt,
+            actionRoute: "/dashboard",
+            actionLabel: "Go to content",
           },
         });
       }
@@ -423,6 +491,10 @@ exports.submitAuthorContentUpdate = async (req, res) => {
       return res.status(403).json({ error: "You can only update your own content" });
     }
 
+    const authorDoc = await db.collection("Users").doc(authorId).get();
+    const authorData = authorDoc.exists ? authorDoc.data() || {} : {};
+    const teamId = authorData.teamId || contentData.teamId || null;
+
     const updatePayload = {
       updatedAt: new Date().toISOString(),
     };
@@ -453,17 +525,49 @@ exports.submitAuthorContentUpdate = async (req, res) => {
       });
     }
 
+    let assignedReviewer = null;
+    const nextStageNormalized = normalizeStageValue(nextStage);
+    if (nextStageNormalized === "review" && !contentData.reviewerId) {
+      assignedReviewer = await findAutoReviewerForTeam(teamId, authorId);
+      if (assignedReviewer) {
+        updatePayload.reviewerId = assignedReviewer.id;
+        updatePayload.assignedAt = new Date().toISOString();
+        updatePayload.assignedBy = authorId;
+      }
+    }
+
     await contentRef.update(updatePayload);
+
+    if (assignedReviewer) {
+      const authorName = buildDisplayName(authorData);
+      const contentTitle = nextTitle.trim() || contentData.title || "Untitled";
+
+      await createNotification({
+        recipientId: assignedReviewer.id,
+        type: "reviewer_assigned",
+        title: "New Review Assignment",
+        message: `${authorName} assigned you to review \"${contentTitle}\".`,
+        contentId,
+        actorId: authorId,
+        eventKey: `reviewer_assigned_${contentId}_${assignedReviewer.id}_${Date.now()}`,
+        dedupe: false,
+        metadata: {
+          contentTitle,
+          assignedBy: authorId,
+          teamId,
+          actionRoute: "/review",
+          actionLabel: "Go to review",
+        },
+      });
+    }
 
     const wasRejected =
       String(contentData.reviewStatus || "").toLowerCase() === "rejected" ||
       String(contentData.stage || "").toLowerCase() === "update" ||
       Boolean(contentData.rejectionReason);
 
-    const reviewerId = contentData.reviewerId;
+    const reviewerId = updatePayload.reviewerId || contentData.reviewerId;
     if (wasRejected && reviewerId) {
-      const authorDoc = await db.collection("Users").doc(authorId).get();
-      const authorData = authorDoc.exists ? authorDoc.data() || {} : {};
       const authorName = buildDisplayName(authorData);
       const contentTitle = (typeof title === "string" && title.trim())
         ? title.trim()
@@ -485,7 +589,12 @@ exports.submitAuthorContentUpdate = async (req, res) => {
       });
     }
 
-    return res.json({ success: true, contentId, ...updatePayload });
+    return res.json({
+      success: true,
+      contentId,
+      assignedReviewerId: updatePayload.reviewerId || contentData.reviewerId || null,
+      ...updatePayload,
+    });
   } catch (error) {
     console.error("ERROR in submitAuthorContentUpdate:", error);
     return res.status(500).json({ error: error.message || "Failed to update content" });

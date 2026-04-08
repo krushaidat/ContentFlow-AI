@@ -6,7 +6,7 @@
  * and an AI writing assistant that suggests continuations as you type.
  */
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { collection, addDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
@@ -105,7 +105,7 @@ const requestAiSuggestions = useCallback(
 
     setLoading(true);
     try {
-      await addDoc(collection(db, "content"), {
+      const createdContent = await addDoc(collection(db, "content"), {
         title: title.trim(),
         text: text.trim(),
         stage,
@@ -115,7 +115,25 @@ const requestAiSuggestions = useCallback(
         createdAt: new Date().toISOString(),
       });
 
-     
+      if (stage === "Review") {
+        try {
+          const response = await fetch(`${API_BASE}/team/content-update`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              authorId: user.uid,
+              contentId: createdContent.id,
+              stage: "Review",
+            }),
+          });
+
+          if (!response.ok) {
+            console.warn("Auto reviewer assignment was skipped for this item.");
+          }
+        } catch (assignError) {
+          console.error("Error auto-assigning reviewer on create:", assignError);
+        }
+      }
 
       setTitle("");
       setText("");

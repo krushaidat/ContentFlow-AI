@@ -137,6 +137,7 @@ const handleManualScheduleSubmit = async () => {
   const [historyItem, setHistoryItem] = useState(null);
   const [historyVersionIndex, setHistoryVersionIndex] = useState(-1);
   const [historyViewMode, setHistoryViewMode] = useState("view");
+  const [isRevertingHistory, setIsRevertingHistory] = useState(false);
   const [pendingHighlightId, setPendingHighlightId] = useState(null);
   const [highlightedContentId, setHighlightedContentId] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -389,6 +390,68 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
   const historyFieldChanged = (snapshot, field, current) =>
     (snapshot?.[field] || "") !== (current?.[field] || "");
 
+  const handleRevertHistoryVersion = async () => {
+    const history = Array.isArray(historyItem?.versionHistory)
+      ? historyItem.versionHistory
+      : [];
+    const selectedSnapshot =
+      historyVersionIndex >= 0 && historyVersionIndex < history.length
+        ? history[historyVersionIndex]
+        : null;
+
+    if (!historyItem || !selectedSnapshot || !user?.uid) {
+      showAlert("Select a saved version to revert to first.", "warning");
+      return;
+    }
+
+    const confirmRevert = window.confirm(
+      `Revert this content to version v${historyVersionIndex + 1}?`
+    );
+
+    if (!confirmRevert) {
+      return;
+    }
+
+    try {
+      setIsRevertingHistory(true);
+
+      const response = await fetch("http://localhost:5000/api/team/content-update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          authorId: user.uid,
+          contentId: historyItem.id,
+          title: selectedSnapshot.title || "",
+          text: selectedSnapshot.text || "",
+          stage: selectedSnapshot.stage || "Draft",
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to revert version");
+      }
+
+      await fetchContent(user);
+      setHistoryItem(null);
+      setHistoryVersionIndex(-1);
+      setHistoryViewMode("view");
+      showAlert(
+        data.assignedReviewerId
+          ? "Version reverted successfully and reviewer assignment was restored."
+          : "Version reverted successfully.",
+        "success"
+      );
+    } catch (revertError) {
+      console.error("Error reverting content version:", revertError);
+      showAlert(revertError.message || "Failed to revert version.", "error");
+    } finally {
+      setIsRevertingHistory(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!pendingDeleteId) return;
 
@@ -485,7 +548,16 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
 
       setEditingId(null);
       fetchContent(user);
-      showAlert("Content updated successfully.", "success");
+      if (editingContent.stage === "Review") {
+        showAlert(
+          data.assignedReviewerId
+            ? "Content moved to Review and a reviewer was assigned automatically."
+            : "Content moved to Review.",
+          "success"
+        );
+      } else {
+        showAlert("Content updated successfully.", "success");
+      }
     } catch (error) {
       console.error("Error updating content:", error);
       setError(error.message || "Failed to update content");
@@ -1220,7 +1292,15 @@ const handleUploadContentToDrive = async (item) => {
                   </div>
                 )}
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ justifyContent: "space-between", gap: 12 }}>
+                <button
+                  type="button"
+                  className="btn-save"
+                  onClick={handleRevertHistoryVersion}
+                  disabled={!selectedSnapshot || isRevertingHistory}
+                >
+                  {isRevertingHistory ? "Reverting..." : "Revert to this version"}
+                </button>
                 <button className="btn-secondary" onClick={() => setHistoryItem(null)}>Close</button>
               </div>
             </div>

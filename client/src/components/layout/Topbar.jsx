@@ -134,6 +134,7 @@ const Topbar = ({
             createdAt: data.createdAt || null,
             type: data.type || null,
             contentId: data.contentId || null,
+            metadata: data.metadata || null,
           };
         });
         setNotifications(next);
@@ -164,18 +165,34 @@ const Topbar = ({
     return `${text.slice(0, maxLength)}...`;
   };
 
-  const getNotificationAction = (type) => {
+  // Aminah: Function to determine the appropriate action route and label based on notification type
+
+  const getNotificationAction = (notification) => {
+    const type = notification?.type;
+    const actionRoute = notification?.metadata?.actionRoute;
+    const actionLabel = notification?.metadata?.actionLabel;
+
+    if (actionRoute) {
+      return { route: actionRoute, label: actionLabel || "Open" };
+    }
+
     if (type === "reviewer_assigned") {
       return { route: "/review", label: "Go to review" };
     }
     if (type === "content_updated") {
       return { route: "/review", label: "Go to review" };
     }
+    if (type === "review_approved") {
+      return { route: "/dashboard", label: "Go to content" };
+    }
+    if (type === "review_rejected") {
+      return { route: "/dashboard", label: "Go to content" };
+    }
     if (type === "content_rejected") {
-      return { route: "/dashboard", label: "View feedback" };
+      return { route: "/dashboard", label: "Go to content" };
     }
     if (type === "ready_to_post") {
-      return { route: "/dashboard", label: "Open content" };
+      return { route: "/calendar", label: "Go to calendar" };
     }
     if (type === "content_scheduled") {
       return { route: "/calendar", label: "Go to calendar" };
@@ -483,7 +500,9 @@ const Topbar = ({
                 </div>
               )}
 
-              {visibleNotifications.map((item) => (
+              {visibleNotifications.map((item) => {
+                const action = getNotificationAction(item);
+                return (
                 <button
                   key={item.id}
                   type="button"
@@ -511,7 +530,6 @@ const Topbar = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveMenu(null);
-                            const action = getNotificationAction(item.type);
                             navigate(action.route, {
                               state: {
                                 highlightContentId: item.contentId || null,
@@ -521,14 +539,15 @@ const Topbar = ({
                             });
                           }}
                         >
-                          {getNotificationAction(item.type).label}
+                          {action.label}
                         </button>
                       </span>
                     )}
                   </span>
                   <span className="notification-time">{formatRelativeTime(item.createdAt)}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {undoPayload && (

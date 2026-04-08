@@ -93,15 +93,17 @@ export const assignReviewerWithGemini = async (contentItem, availableReviewers) 
  * @param {Function} getDocs
  * @returns {Promise<Array<Object>>} normalized reviewer records
  */
-export const getAvailableReviewers = async (db, collection, query, getDocs) => {
+export const getAvailableReviewers = async (db, collection, query, getDocs, teamId = null) => {
   try {
     const q = query(collection(db, 'Users'), where('role', '==', 'reviewer'));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map(doc => ({
-      uid: doc.id,
-      ...doc.data()
-    }));
+    return snapshot.docs
+      .map(doc => ({
+        uid: doc.id,
+        ...doc.data()
+      }))
+      .filter((reviewer) => !teamId || reviewer.teamId === teamId);
   } catch (error) {
     console.error('Error fetching available reviewers:', error);
     return [];
