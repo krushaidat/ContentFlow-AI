@@ -223,26 +223,26 @@ const Workflow = () => {
   };
 
   const handleFixes = async () => {
+    let updatedContent = { ...selectedContent };
+    
     const fixData = await handleApplyFixes(
       selectedContent,
       selectedTemplateId,
       showAlert,
       (data) => {
-        setSelectedContent((prev) => ({
-          ...prev,
-          title: data.fixedTitle || prev.title,
-          text: data.fixedText || prev.text,
-        }));
+        updatedContent = {
+          ...updatedContent,
+          title: data.fixedTitle || updatedContent.title,
+          text: data.fixedText || updatedContent.text,
+        };
+        
+        setSelectedContent(updatedContent);
 
         setItems((prev) =>
           prev.map((item) =>
             item.id === selectedContent.id
-              ? {
-                  ...item,
-                  title: data.fixedTitle || item.title,
-                  text: data.fixedText || item.text,
-                }
-              : item,
+            ? { ...item, title: updatedContent.title, text: updatedContent.text }
+            : item
           ),
         );
       },
@@ -250,28 +250,82 @@ const Workflow = () => {
 
     if (fixData) {
       await revalidateAfterFixes(
-        selectedContent,
+        updatedContent,
         selectedTemplateId,
         showAlert,
       );
       const revalidation = await handleValidateContent(
-        selectedContent,
+        updatedContent,
         selectedTemplateId,
         showAlert,
       );
       if (revalidation) {
-        setValidationResult(revalidation);
-        // Keep items in sync so badges reflect latest score
+      setValidationResult(revalidation);
+
+      if (revalidation.brandScore >= 80) {
+        // Same promotion logic as handleValidate
+        const reviewers = await getAvailableReviewers(db, collection, query, getDocs);
+        const assignedReviewerId = await assignReviewerWithGemini(updatedContent, reviewers);
+
+        const updatePayload = {
+          stage: "Review",
+          validation: revalidation,
+          validatedTemplateId: selectedTemplateId,
+          validatedAt: new Date().toISOString(),
+        };
+        if (assignedReviewerId) {
+          updatePayload.suggestedReviewerId = assignedReviewerId;
+        }
+
+        await updateDoc(doc(db, "content", updatedContent.id), updatePayload);
+
+        try {
+          const uid = auth.currentUser?.uid;
+          const q = query(
+            collection(db, "content"),
+            where("createdBy", "==", uid),
+            where("stage", "==", "Review"),
+            limit(50),
+          );
+          const snapshot = await getDocs(q);
+          const reviewItems = snapshot.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+          setItems(reviewItems);
+          const movedItem =
+            reviewItems.find((item) => item.id === updatedContent.id) || reviewItems[0];
+          setSelectedContent(movedItem);
+          setValidationResult(movedItem?.validation || null);
+          setShowValidationPanel(!!movedItem?.validation);
+          setSelectedReviewer(null);
+        } catch (err) {
+          console.error("Error fetching Review items after fix:", err);
+        }
+
+        setSelectedStage("Review");
+        showAlert(
+          assignedReviewerId
+            ? "Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
+            : "Content passed! Moved to Review stage.",
+          "success",
+        );
+      } else {
+        // Score still below 80 — just sync items
         setItems((prev) =>
           prev.map((item) =>
-            item.id === selectedContent.id
+            item.id === updatedContent.id
               ? { ...item, validation: revalidation }
               : item
           )
         );
-     }
+        setSelectedContent((prev) =>
+          prev ? { ...prev, validation: revalidation } : prev
+        );
+      }
     }
-  };
+  }
+};
 
   const handleAssignReviewerClick = async () => {
     const effectiveReviewerId =
