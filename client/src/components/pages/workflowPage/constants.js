@@ -7,7 +7,6 @@ export const API_BASE = "http://localhost:5000/api";
 
 export const STAGES = [
   "Draft",
-  "Planning",
   "Review",
   "Update",
   "Ready-To-Post",
