@@ -86,12 +86,67 @@ function decryptText(encObj) {
   return dec.toString("utf8");
 }
 
+async function markDriveReconnectRequired(uid) {
+  try {
+    await db.collection("Users").doc(uid).set({
+      integrations: {
+        googleDrive: {
+          connected: false,
+          refreshTokenEncrypted: null,
+          updatedAt: new Date().toISOString()
+        }
+      }
+    }, { merge: true });
+  } catch (error) {
+    console.warn("markDriveReconnectRequired warning:", error.message);
+  }
+}
+
+function normalizeDriveError(error) {
+  const raw = String(error?.message || "").toLowerCase();
+  const responseError = String(error?.response?.data?.error || "").toLowerCase();
+
+  if (
+    raw.includes("invalid_grant") ||
+    raw.includes("invalid_credentials") ||
+    raw.includes("token has been expired") ||
+    raw.includes("refresh") ||
+    responseError.includes("invalid_grant")
+  ) {
+    const err = new Error("Drive token is invalid or expired");
+    err.code = "DRIVE_RECONNECT_REQUIRED";
+    return err;
+  }
+
+  return error;
+}
+
+function sendDriveError(res, operationName, error) {
+  if (error.code === "DRIVE_NOT_CONNECTED") {
+    return res.status(400).json({ error: "Google Drive is not connected" });
+  }
+  if (error.code === "DRIVE_RECONNECT_REQUIRED") {
+    return res.status(400).json({ error: "Drive connection expired. Please reconnect Google Drive." });
+  }
+  if (error.code === "USER_NOT_FOUND") {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  console.error(operationName + " error:", error.message);
+  return res.status(500).json({
+    error: "Failed to " + operationName,
+    ...(process.env.NODE_ENV === "production" ? {} : { detail: error.message })
+  });
+}
+
 async function getDriveForUser(uid) {
   const userRef = db.collection("Users").doc(uid);
   const userSnap = await userRef.get();
 
   if (!userSnap.exists) {
-    throw new Error("User document not found");
+    const err = new Error("User document not found");
+    err.code = "USER_NOT_FOUND";
+    throw err;
   }
 
   const userData = userSnap.data() || {};
@@ -104,9 +159,40 @@ async function getDriveForUser(uid) {
     throw err;
   }
 
-  const refreshToken = decryptText(encryptedRefreshToken);
+  let refreshToken;
+  try {
+    // Backward compatibility: some older records may have plaintext tokens.
+    if (typeof encryptedRefreshToken === "string") {
+      refreshToken = encryptedRefreshToken;
+    } else {
+      refreshToken = decryptText(encryptedRefreshToken);
+    }
+  } catch (error) {
+    await markDriveReconnectRequired(uid);
+    const reconnectErr = new Error("Stored Drive token could not be decrypted");
+    reconnectErr.code = "DRIVE_RECONNECT_REQUIRED";
+    throw reconnectErr;
+  }
+
+  if (!refreshToken || typeof refreshToken !== "string") {
+    await markDriveReconnectRequired(uid);
+    const reconnectErr = new Error("Stored Drive token is missing or malformed");
+    reconnectErr.code = "DRIVE_RECONNECT_REQUIRED";
+    throw reconnectErr;
+  }
+
   const oauth2Client = getOAuthClient();
   oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+  try {
+    await oauth2Client.getAccessToken();
+  } catch (error) {
+    const normalizedError = normalizeDriveError(error);
+    if (normalizedError.code === "DRIVE_RECONNECT_REQUIRED") {
+      await markDriveReconnectRequired(uid);
+    }
+    throw normalizedError;
+  }
 
   const driveApi = google.drive({ version: "v3", auth: oauth2Client });
   return { driveApi, oauth2Client, userRef };
@@ -276,11 +362,7 @@ exports.listDrives = async (req, res) => {
 
     return res.json({ drives: [myDrive, ...sharedDrives] });
   } catch (error) {
-    if (error.code === "DRIVE_NOT_CONNECTED") {
-      return res.status(400).json({ error: "Google Drive is not connected" });
-    }
-    console.error("listDrives error:", error.message);
-    return res.status(500).json({ error: "Failed to list drives" });
+    return sendDriveError(res, "list drives", error);
   }
 };
 
@@ -334,11 +416,7 @@ exports.listFiles = async (req, res) => {
       nextPageToken: resp.data.nextPageToken || null
     });
   } catch (error) {
-    if (error.code === "DRIVE_NOT_CONNECTED") {
-      return res.status(400).json({ error: "Google Drive is not connected" });
-    }
-    console.error("listFiles error:", error.message);
-    return res.status(500).json({ error: "Failed to list files" });
+    return sendDriveError(res, "list files", error);
   }
 };
 
@@ -402,11 +480,7 @@ exports.importDriveFileToContent = async (req, res) => {
       title: contentPayload.title
     });
   } catch (error) {
-    if (error.code === "DRIVE_NOT_CONNECTED") {
-      return res.status(400).json({ error: "Google Drive is not connected" });
-    }
-    console.error("importDriveFileToContent error:", error.message);
-    return res.status(500).json({ error: "Failed to import file from Drive" });
+    return sendDriveError(res, "import file from Drive", error);
   }
 };
 
@@ -491,11 +565,7 @@ exports.uploadContentToDrive = async (req, res) => {
       webViewLink: webViewLink
     });
   } catch (error) {
-    if (error.code === "DRIVE_NOT_CONNECTED") {
-      return res.status(400).json({ error: "Google Drive is not connected" });
-    }
-    console.error("uploadContentToDrive error:", error.message);
-    return res.status(500).json({ error: "Failed to upload content to Drive" });
+    return sendDriveError(res, "upload content to Drive", error);
   }
 };
 
@@ -581,10 +651,6 @@ exports.previewDriveFile = async (req, res) => {
       truncated: previewText !== null && previewText.length === PREVIEW_CHAR_LIMIT
     });
   } catch (error) {
-    if (error.code === "DRIVE_NOT_CONNECTED") {
-      return res.status(400).json({ error: "Google Drive is not connected" });
-    }
-    console.error("previewDriveFile error:", error.message);
-    return res.status(500).json({ error: "Failed to preview file" });
+    return sendDriveError(res, "preview file", error);
   }
 };
