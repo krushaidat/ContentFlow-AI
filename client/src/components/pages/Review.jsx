@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import useInPageAlert from '../../hooks/useInPageAlert';
-import { collection, onSnapshot, query, where, updateDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import InPageAlert from '../InPageAlert';
 import '../styles/dashboard.css';
@@ -18,7 +19,28 @@ const ReviewPage = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [selectedVersionIndex, setSelectedVersionIndex] = useState(-1);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versionViewMode, setVersionViewMode] = useState('view');
+  const [highlightedContentId, setHighlightedContentId] = useState(null);
+  const location = useLocation();
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
+
+
+  /* Aminah updated: added state for version history panel inside the review modal 
+    — which snapshot is selected, whether the panel is visible, and view vs compare mode. 
+  */
+
+  // Handle notification highlight on arrival
+  useEffect(() => {
+    if (location.state?.highlightContentId) {
+      setHighlightedContentId(location.state.highlightContentId);
+      const timer = setTimeout(() => {
+        setHighlightedContentId(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state?.highlightContentId]);
 
   /**DRAVEN
    * Streams assigned content in real time for the logged-in reviewer.
@@ -69,9 +91,27 @@ const ReviewPage = () => {
    * Opens the detail modal for a selected content item.
    * @param {Object} item - Content item to preview/review.
    */
+  // Aminah updated: when opening a content item for review, initialise version history state so the panel always starts collapsed on the latest snapshot.
   const handleView = (item) => {
     setViewingItem(item);
+    const history = Array.isArray(item?.versionHistory) ? item.versionHistory : [];
+    setSelectedVersionIndex(history.length > 0 ? history.length - 1 : -1);
+    setShowVersionHistory(false);
+    setVersionViewMode('view');
     setShowViewModal(true);
+  };
+
+  // Aminah updated: converts a versionHistory snapshotAt value to a readable local date/time string.
+  const formatVersionTimestamp = (value) => {
+    if (!value) return 'Unknown time';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'Unknown time';
+    return parsed.toLocaleString();
+  };
+
+  // Aminah updated: returns true when a field value differs between a past snapshot and the current content, used to highlight changed fields in compare mode.
+  const hasFieldChanged = (snapshot, field, current) => {
+    return (snapshot?.[field] || '') !== (current?.[field] || '');
   };
 
   /**DRAVEN
@@ -82,16 +122,26 @@ const ReviewPage = () => {
   const handleApprove = async (itemId) => {
     try {
       setUpdatingId(itemId);
-      await updateDoc(doc(db, 'content', itemId), {
-        stage: 'Ready to Post',
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: user.uid,
-        reviewStatus: 'approved'
+      const response = await fetch('http://localhost:5000/api/team/review-decision', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reviewerId: user.uid,
+          contentId: itemId,
+          decision: 'approved',
+        }),
       });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to approve content.');
+      }
       
       setAssignedItems(assignedItems.map(item => 
         item.id === itemId 
-          ? { ...item, stage: 'Ready to Post', reviewStatus: 'approved' }
+          ? { ...item, stage: 'Ready To Post', reviewStatus: 'approved', rejectionReason: undefined }
           : item
       ));
       showAlert('Content approved successfully!', 'success');
@@ -122,13 +172,23 @@ const ReviewPage = () => {
 
     try {
       setUpdatingId(itemId);
-      await updateDoc(doc(db, 'content', itemId), {
-        stage: 'Update',
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: user.uid,
-        reviewStatus: 'rejected',
-        rejectionReason: rejectReason
+      const response = await fetch('http://localhost:5000/api/team/review-decision', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reviewerId: user.uid,
+          contentId: itemId,
+          decision: 'rejected',
+          rejectionReason: rejectReason,
+        }),
       });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject content.');
+      }
       
       setAssignedItems(assignedItems.map(item => 
         item.id === itemId 
@@ -161,6 +221,7 @@ const ReviewPage = () => {
       review: "badge-review",
       update: "badge-update",
       "ready-to-post": "badge-ready",
+      "ready to post": "badge-ready",
     };
     return statusMap[stage?.toLowerCase()] || "badge-draft";
   };
@@ -184,6 +245,14 @@ const ReviewPage = () => {
 
   if (loading) return <div className="loading">Loading your assigned reviews...</div>;
 
+  const versionHistory = Array.isArray(viewingItem?.versionHistory)
+    ? viewingItem.versionHistory
+    : [];
+  const selectedSnapshot =
+    selectedVersionIndex >= 0 && selectedVersionIndex < versionHistory.length
+      ? versionHistory[selectedVersionIndex]
+      : null;
+
   return (
     <div className="dashboard-main">
       <InPageAlert alertState={alertState} onClose={dismissAlert} />
@@ -198,7 +267,7 @@ const ReviewPage = () => {
       ) : (
         <div className="dashboard-content-list">
           {assignedItems.map((item) => (
-            <div key={item.id} className="dashboard-content-card content-item-box">
+            <div key={item.id} className={`dashboard-content-card content-item-box ${highlightedContentId === item.id ? 'notification-highlight' : ''}`}>
               <div className="dashboard-content-header">
 {/*Tanvir- 
 - Moved view button to top-right of each card header
@@ -261,6 +330,111 @@ const ReviewPage = () => {
               <p><strong>Stage:</strong> {viewingItem.stage}</p>
               <p><strong>Content:</strong></p>
               <p>{viewingItem.text}</p>
+
+              {/* Aminah updated: toggle button to show or hide the version history panel inside the review modal. */}
+              <button
+                className="btn-toggle-history"
+                onClick={() => setShowVersionHistory(!showVersionHistory)}
+                style={{ marginTop: '1rem', marginBottom: '1rem' }}
+              >
+                {showVersionHistory ? 'Hide' : 'Show'} Version History
+              </button>
+
+              {/* Aminah updated: version history panel — version selector dropdown, view-only mode, and side-by-side compare mode with changed-field highlighting. */}
+              {showVersionHistory && (
+                <div className="compare-view-block">
+                  <div className="compare-view-header-row">
+                    {selectedSnapshot && (
+                      <div className="history-view-toggle">
+                        <button
+                          type="button"
+                          className={`history-toggle-btn ${versionViewMode === 'view' ? 'active' : ''}`}
+                          onClick={() => setVersionViewMode('view')}
+                        >
+                          View version
+                        </button>
+                        <button
+                          type="button"
+                          className={`history-toggle-btn ${versionViewMode === 'compare' ? 'active' : ''}`}
+                          onClick={() => setVersionViewMode('compare')}
+                        >
+                          Compare
+                        </button>
+                      </div>
+                    )}
+                    <select
+                      className="compare-version-select"
+                      value={selectedVersionIndex}
+                      onChange={(e) => {
+                        setSelectedVersionIndex(Number(e.target.value));
+                        setVersionViewMode('view');
+                      }}
+                    >
+                      <option value={-1}>Current version only</option>
+                      {versionHistory.map((version, idx) => (
+                        <option key={`${version.snapshotAt || 'v'}-${idx}`} value={idx}>
+                          {`v${idx + 1} · ${formatVersionTimestamp(version.snapshotAt)} · ${
+                            version.changeType === 'manual_edit' ? 'Manual edit'
+                            : version.changeType === 'review_approved' ? 'Approved'
+                            : version.changeType === 'review_rejected' ? 'Rejected'
+                            : version.changeType || 'Edit'
+                          }`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {versionViewMode === 'view' && selectedSnapshot ? (
+                    <div className="compare-grid compare-grid-single">
+                      <div className="compare-card old-version">
+                        <div className="compare-card-title">Past Version (v{selectedVersionIndex + 1})</div>
+                        <p>
+                          <strong>Title:</strong> {selectedSnapshot.title || '(empty)'}
+                        </p>
+                        <p>
+                          <strong>Stage:</strong> {selectedSnapshot.stage || 'Draft'}
+                        </p>
+                        <p>
+                          <strong>Text:</strong> {selectedSnapshot.text || '(empty)'}
+                        </p>
+                        <p className="history-snapshot-meta">Saved: {formatVersionTimestamp(selectedSnapshot.snapshotAt)}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`compare-grid ${selectedSnapshot ? '' : 'compare-grid-single'}`}>
+                      {selectedSnapshot && (
+                        <div className="compare-card old-version">
+                          <div className="compare-card-title">Past Version (v{selectedVersionIndex + 1})</div>
+                          <p className={hasFieldChanged(selectedSnapshot, 'title', viewingItem) ? 'compare-changed' : ''}>
+                            <strong>Title:</strong> {selectedSnapshot.title || '(empty)'}
+                          </p>
+                          <p className={hasFieldChanged(selectedSnapshot, 'stage', viewingItem) ? 'compare-changed' : ''}>
+                            <strong>Stage:</strong> {selectedSnapshot.stage || 'Draft'}
+                          </p>
+                          <p className={hasFieldChanged(selectedSnapshot, 'text', viewingItem) ? 'compare-changed' : ''}>
+                            <strong>Text:</strong> {selectedSnapshot.text || '(empty)'}
+                          </p>
+                          <p className="history-snapshot-meta">Saved: {formatVersionTimestamp(selectedSnapshot.snapshotAt)}</p>
+                        </div>
+                      )}
+
+                      <div className="compare-card new-version current-version-card">
+                        <div className="compare-card-title">Current Version</div>
+                        <p className={selectedSnapshot && hasFieldChanged(selectedSnapshot, 'title', viewingItem) ? 'compare-changed' : ''}>
+                          <strong>Title:</strong> {viewingItem.title || '(empty)'}
+                        </p>
+                        <p className={selectedSnapshot && hasFieldChanged(selectedSnapshot, 'stage', viewingItem) ? 'compare-changed' : ''}>
+                          <strong>Stage:</strong> {viewingItem.stage || 'Draft'}
+                        </p>
+                        <p className={selectedSnapshot && hasFieldChanged(selectedSnapshot, 'text', viewingItem) ? 'compare-changed' : ''}>
+                          <strong>Text:</strong> {viewingItem.text || '(empty)'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {viewingItem.rejectionReason && (
                 <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '4px' }}>
                   <strong>Feedback from reviewer:</strong>

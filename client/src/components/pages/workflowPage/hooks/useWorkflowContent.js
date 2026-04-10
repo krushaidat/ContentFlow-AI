@@ -14,6 +14,10 @@ import {
   doc,
 } from "firebase/firestore";
 import { db, auth } from "../../../../firebase";
+import {
+  READY_TO_POST_STAGE_ALIASES,
+  normalizeStageLabel,
+} from "../constants";
 
 export const useWorkflowContent = () => {
   const [selectedStage, setSelectedStage] = useState("Draft");
@@ -21,6 +25,18 @@ export const useWorkflowContent = () => {
   const [selectedContent, setSelectedContent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const syncSelectedContent = useCallback((nextItems) => {
+    setSelectedContent((prev) => {
+      if (!prev) {
+        return nextItems[0] || null;
+      }
+
+      return (
+        nextItems.find((item) => item.id === prev.id) || nextItems[0] || null
+      );
+    });
+  }, []);
 
   // Auto-move validated items to Review
   const autoMoveValidatedItems = useCallback(async (itemsList) => {
@@ -54,52 +70,47 @@ export const useWorkflowContent = () => {
           return;
         }
 
+        const stageFilter = READY_TO_POST_STAGE_ALIASES.includes(stageToFetch)
+          ? where("stage", "in", READY_TO_POST_STAGE_ALIASES)
+          : where("stage", "==", stageToFetch);
+
         const q = query(
           collection(db, "content"),
           where("createdBy", "==", uid),
-          where("stage", "==", stageToFetch),
+          stageFilter,
           limit(50)
         );
 
+        const mapSnapshotItems = (snapshot) =>
+          snapshot.docs
+            .map((d) => {
+              const data = d.data();
+              return {
+                id: d.id,
+                ...data,
+                stage: normalizeStageLabel(data.stage),
+              };
+            })
+            .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
         const snapshot = await getDocs(q);
-        const results = snapshot.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+        const results = mapSnapshotItems(snapshot);
 
         // Auto-move items with score >= 80 from Draft to Review
         if (stageToFetch === "Draft") {
           const itemsMoved = await autoMoveValidatedItems(results);
           if (itemsMoved) {
             const updatedSnapshot = await getDocs(q);
-            const updatedResults = updatedSnapshot.docs
-              .map((d) => ({ id: d.id, ...d.data() }))
-              .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+            const updatedResults = mapSnapshotItems(updatedSnapshot);
             setItems(updatedResults);
-
-            if (updatedResults.length > 0) {
-              setSelectedContent(updatedResults[0]);
-            } else {
-              setSelectedContent(null);
-            }
+            syncSelectedContent(updatedResults);
           } else {
             setItems(results);
-            if (!selectedContent || !results.find((r) => r.id === selectedContent.id)) {
-              if (results.length > 0) {
-                setSelectedContent(results[0]);
-              } else {
-                setSelectedContent(null);
-              }
-            }
+            syncSelectedContent(results);
           }
         } else {
           setItems(results);
-          if (!selectedContent || !results.find((r) => r.id === selectedContent.id)) {
-            if (results.length > 0) {
-              setSelectedContent(results[0]);
-            } else {
-              setSelectedContent(null);
-            }
-          }
+          syncSelectedContent(results);
         }
       } catch (err) {
         console.error(err);
@@ -108,7 +119,7 @@ export const useWorkflowContent = () => {
         setLoading(false);
       }
     },
-    [selectedContent, autoMoveValidatedItems]
+    [autoMoveValidatedItems, syncSelectedContent]
   );
 
   return {

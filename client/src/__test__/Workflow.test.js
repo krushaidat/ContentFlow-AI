@@ -17,7 +17,7 @@ const STAGES = [
   "Planning",
   "Review",
   "Update",
-  "Ready-To-Post",
+  "Ready To Post",
   "Posted",
 ];
 
@@ -78,14 +78,14 @@ describe("TC-U11: Workflow State Management – Valid Transition", () => {
     expect(result.newStage).toBe("Update");
   });
 
-  test("Update → Ready-To-Post is a valid transition", () => {
-    const result = simulateTransition("content_001", "Update", "Ready-To-Post");
+  test("Update → Ready To Post is a valid transition", () => {
+    const result = simulateTransition("content_001", "Update", "Ready To Post");
     expect(result.success).toBe(true);
-    expect(result.newStage).toBe("Ready-To-Post");
+    expect(result.newStage).toBe("Ready To Post");
   });
 
-  test("Ready-To-Post → Posted is a valid transition", () => {
-    const result = simulateTransition("content_001", "Ready-To-Post", "Posted");
+  test("Ready To Post → Posted is a valid transition", () => {
+    const result = simulateTransition("content_001", "Ready To Post", "Posted");
     expect(result.success).toBe(true);
     expect(result.newStage).toBe("Posted");
   });
@@ -96,7 +96,7 @@ describe("TC-U11: Workflow State Management – Valid Transition", () => {
       "Planning",
       "Review",
       "Update",
-      "Ready-To-Post",
+      "Ready To Post",
       "Posted",
     ]);
     expect(STAGES.length).toBe(6);
@@ -105,8 +105,8 @@ describe("TC-U11: Workflow State Management – Valid Transition", () => {
 
 // TC-U12: Workflow State Management – Invalid Transition Blocked
 describe("TC-U12: Workflow State Management – Invalid Transition Blocked", () => {
-  test("Draft → Ready-To-Post should be blocked (skipping stages)", () => {
-    const result = simulateTransition("content_001", "Draft", "Ready-To-Post");
+  test("Draft → Ready To Post should be blocked (skipping stages)", () => {
+    const result = simulateTransition("content_001", "Draft", "Ready To Post");
     expect(result.success).toBe(false);
     expect(result.error).toContain("Invalid transition");
     expect(result.updateDocCalled).toBeUndefined(); // updateDoc should NOT be called
@@ -133,8 +133,8 @@ describe("TC-U12: Workflow State Management – Invalid Transition Blocked", () 
     expect(result.success).toBe(false);
   });
 
-  test("Planning → Ready-To-Post should be blocked (skipping Review/Update)", () => {
-    const result = simulateTransition("content_001", "Planning", "Ready-To-Post");
+  test("Planning → Ready To Post should be blocked (skipping Review/Update)", () => {
+    const result = simulateTransition("content_001", "Planning", "Ready To Post");
     expect(result.success).toBe(false);
   });
 

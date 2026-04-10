@@ -14,8 +14,7 @@ const ContentList = ({
   selectedContent,
   onSelectContent,
   onViewContent,
-  onStageChange,
-  STAGES,
+  highlightedContentId,
 }) => {
   return (
     <section className="wf-card">
@@ -54,7 +53,7 @@ const ContentList = ({
               return (
                 <li
                   key={item.id}
-                  className={`wf-item ${isActive ? "active" : ""}`}
+                  className={`wf-item ${isActive ? "active" : ""} ${highlightedContentId === item.id ? "notification-highlight" : ""}`}
                   onClick={() => onSelectContent(item)}
                 >
                   {/* Top row: title + view btn */}
@@ -65,7 +64,11 @@ const ContentList = ({
                         className="wf-view-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onViewContent(item);
+                          if (typeof onViewContent === "function") {
+                            onViewContent(item);
+                          } else {
+                            onSelectContent(item);
+                          }
                         }}
                         title="View full content"
                       >

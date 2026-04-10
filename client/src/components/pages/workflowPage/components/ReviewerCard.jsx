@@ -17,13 +17,8 @@ const ReviewerCard = ({
   onSelectReviewer,
   onAssignReviewer,
 }) => {
-  // Aminah Update: fixed reviewer assignment logic to prioritize selected reviewer, then suggested, then current
-  const effectiveReviewerId =
-    selectedReviewer ||
-    selectedContent?.suggestedReviewerId ||
-    selectedContent?.reviewerId;
-  const currentAssignmentId =
-    selectedContent?.reviewerId || selectedContent?.suggestedReviewerId;
+  const currentAssignmentId = selectedContent?.reviewerId;
+  const isSameReviewer = Boolean(selectedReviewer) && selectedReviewer === currentAssignmentId;
 
   // Only show for Review stage and admin users
   if (selectedStage !== "Review" || userRole !== "admin" || !selectedContent) {
@@ -42,9 +37,7 @@ const ReviewerCard = ({
             <div className="reviewer-subtitle">Current Assignment</div>
             {currentAssignmentId ? (
               <div className="reviewer-assigned">
-                <span className="reviewer-badge">
-                  {selectedContent.reviewerId ? "✓ Assigned" : "◇ Auto Suggested"}
-                </span>
+                <span className="reviewer-badge">✓ Assigned</span>
                 <div className="reviewer-id-text">
                   {currentReviewerName} ({currentAssignmentId})
                 </div>
@@ -57,7 +50,6 @@ const ReviewerCard = ({
           </div>
 
           <div className="reviewer-section">
-            <label className="reviewer-label">Select Reviewer</label>
             {availableReviewers.length > 0 ? (
               <>
                 <div className="select-wrap">
@@ -79,9 +71,13 @@ const ReviewerCard = ({
                 <button
                   className="assign-reviewer-btn"
                   onClick={onAssignReviewer}
-                  disabled={!effectiveReviewerId || assigningReviewer}
+                  disabled={!selectedReviewer || isSameReviewer || assigningReviewer}
                 >
-                  {assigningReviewer ? "Assigning..." : "Assign Reviewer"}
+                  {assigningReviewer
+                    ? "Assigning..."
+                    : currentAssignmentId && !isSameReviewer
+                      ? "Reassign Reviewer"
+                      : "Assign Selected Reviewer"}
                 </button>
               </>
             ) : (
