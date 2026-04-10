@@ -453,14 +453,14 @@
 .notifications-select-row input:checked::after {
   content: "";
   position: absolute;
-  left: 6px;
-  top: 3px;
+  left: 50%;
+  top: 50%;
   width: 4px;
   height: 8px;
   border: 2px solid #111827;
   border-top: none;
   border-left: none;
-  transform: rotate(45deg);
+  transform: translate(-50%, -58%) rotate(45deg);
 }
 
 .notifications-select-row input:indeterminate {
@@ -471,12 +471,13 @@
 .notifications-select-row input:indeterminate::after {
   content: "";
   position: absolute;
-  left: 5px;
-  top: 8px;
+  left: 50%;
+  top: 50%;
   width: 10px;
-  height: 2px;
+  height: 2.5px;
   background: #111827;
-  border-radius: 2px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
 }
 
 .notifications-select-actions {
@@ -691,14 +692,14 @@
 .notification-item-select:checked::after {
   content: "";
   position: absolute;
-  left: 4px;
-  top: 1px;
+  left: 50%;
+  top: 50%;
   width: 4px;
   height: 8px;
   border: 2px solid #111827;
   border-top: none;
   border-left: none;
-  transform: rotate(45deg);
+  transform: translate(-50%, -58%) rotate(45deg);
 }
 
 .notification-item:hover,
