@@ -215,12 +215,12 @@ const ValidationPanel = ({
               <button
                 className="apply-fixes-btn"
                 onClick={onApplyFixes}
-                disabled={isApplyingFixes}
+                disabled={isApplyingFixes || isValidating}
               >
                 {isApplyingFixes ? (
                   <span className="btn-loading">
                     <span className="spinner" />
-                    Applying Fixes…
+                    Applying Fixes & Re-Validating…
                   </span>
                 ) : (
                   "Apply AI Fixes & Re-Validate"

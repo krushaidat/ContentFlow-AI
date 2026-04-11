@@ -25,6 +25,19 @@ const isReadyToPostStage = (stage) =>
 const normalizeStageLabel = (stage) =>
   isReadyToPostStage(stage) ? READY_TO_POST_LABEL : stage;
 
+const toComparableTimestamp = (value) => {
+  if (!value) return 0;
+  if (typeof value === "number") return value;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.seconds === "number") {
+    const nanos = typeof value.nanoseconds === "number" ? value.nanoseconds : 0;
+    return value.seconds * 1000 + Math.floor(nanos / 1e6);
+  }
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 export default function Dashboard() {
   const ALL_STAGES = "All Stages";
   const STAGES = [
@@ -126,7 +139,7 @@ const handleManualScheduleSubmit = async () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState(null);
-  const [selectedStage, setSelectedStage] = useState(ALL_STAGES);//Filter stages
+  const [selectedStage, setSelectedStage] = useState("Draft");//Filter stages
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
@@ -204,7 +217,7 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
           ...data,
           stage: normalizeStageLabel(data.stage),
         };
-      }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      }).sort((a, b) => toComparableTimestamp(b.createdAt) - toComparableTimestamp(a.createdAt));
       setContent(items);
       setError(null);
     } catch (err) {
@@ -758,10 +771,10 @@ const handleUploadContentToDrive = async (item) => {
     );
   }
   const filteredContent = content.filter((item) => {
+    const query = search.trim().toLowerCase();
+    if (query.length === 0) return true;
     const title = (item.title || "").toLowerCase();
-    const text = (item.text || "").toLowerCase();
-    const query = search.toLowerCase();
-    return title.includes(query) || text.includes(query);
+    return title.includes(query);
   });
   
  

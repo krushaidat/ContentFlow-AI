@@ -52,6 +52,7 @@ const Workflow = () => {
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
   const [highlightedContentId, setHighlightedContentId] = useState(null);
   const [viewingContent, setViewingContent] = useState(null);
+  const [isFixingAndRevalidating, setIsFixingAndRevalidating] = useState(false);
 
   // Content management
   const {
@@ -91,7 +92,6 @@ const Workflow = () => {
     showFixesSummary,
     setShowFixesSummary,
     handleApplyFixes,
-    revalidateAfterFixes,
   } = useFixes();
 
   // Reviewers
@@ -270,8 +270,10 @@ const Workflow = () => {
   };
 
   const handleFixes = async () => {
-    let updatedContent = { ...selectedContent };
-    
+    setIsFixingAndRevalidating(true);
+    try {
+      let updatedContent = { ...selectedContent };
+
     const fixData = await handleApplyFixes(
       selectedContent,
       selectedTemplateId,
@@ -282,97 +284,141 @@ const Workflow = () => {
           title: data.fixedTitle || updatedContent.title,
           text: data.fixedText || updatedContent.text,
         };
-        
+
         setSelectedContent(updatedContent);
 
         setItems((prev) =>
           prev.map((item) =>
             item.id === selectedContent.id
-            ? { ...item, title: updatedContent.title, text: updatedContent.text }
-            : item
+              ? { ...item, title: updatedContent.title, text: updatedContent.text }
+              : item
           ),
         );
       },
     );
 
-    if (fixData) {
-      await revalidateAfterFixes(
-        updatedContent,
-        selectedTemplateId,
-        showAlert,
+    if (!fixData) return;
+
+    // Re-validate with the fixed content
+    const revalidation = await handleValidateContent(
+      updatedContent,
+      selectedTemplateId,
+      showAlert,
+    );
+
+    if (!revalidation) return;
+
+    // Immediately update validation state
+    setValidationResult(revalidation);
+    setShowValidationPanel(true);
+
+    if (revalidation.brandScore >= 80) {
+      // Promotion to Review — same logic as handleValidate
+      const reviewers = await getAvailableReviewers(
+        db,
+        collection,
+        query,
+        getDocs,
+        user?.teamId || null,
       );
-      const revalidation = await handleValidateContent(
+      const assignedReviewerId = await assignReviewerWithGemini(
         updatedContent,
-        selectedTemplateId,
-        showAlert,
+        reviewers,
       );
-      if (revalidation) {
-      setValidationResult(revalidation);
 
-      if (revalidation.brandScore >= 80) {
-        // Same promotion logic as handleValidate
-        const reviewers = await getAvailableReviewers(db, collection, query, getDocs);
-        const assignedReviewerId = await assignReviewerWithGemini(updatedContent, reviewers);
+      const updatePayload = {
+        stage: "Review",
+        validation: revalidation,
+        validatedTemplateId: selectedTemplateId,
+        validatedAt: new Date().toISOString(),
+      };
 
-        const updatePayload = {
-          stage: "Review",
-          validation: revalidation,
-          validatedTemplateId: selectedTemplateId,
-          validatedAt: new Date().toISOString(),
-        };
-        if (assignedReviewerId) {
-          updatePayload.suggestedReviewerId = assignedReviewerId;
-        }
-
-        await updateDoc(doc(db, "content", updatedContent.id), updatePayload);
-
-        try {
-          const uid = auth.currentUser?.uid;
-          const q = query(
-            collection(db, "content"),
-            where("createdBy", "==", uid),
-            where("stage", "==", "Review"),
-            limit(50),
-          );
-          const snapshot = await getDocs(q);
-          const reviewItems = snapshot.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-
-          setItems(reviewItems);
-          const movedItem =
-            reviewItems.find((item) => item.id === updatedContent.id) || reviewItems[0];
-          setSelectedContent(movedItem);
-          setValidationResult(movedItem?.validation || null);
-          setShowValidationPanel(!!movedItem?.validation);
-          setSelectedReviewer(null);
-        } catch (err) {
-          console.error("Error fetching Review items after fix:", err);
-        }
-
-        setSelectedStage("Review");
-        showAlert(
-          assignedReviewerId
-            ? "Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
-            : "Content passed! Moved to Review stage.",
-          "success",
-        );
-      } else {
-        // Score still below 80 — just sync items
-        setItems((prev) =>
-          prev.map((item) =>
-            item.id === updatedContent.id
-              ? { ...item, validation: revalidation }
-              : item
-          )
-        );
-        setSelectedContent((prev) =>
-          prev ? { ...prev, validation: revalidation } : prev
-        );
+      if (assignedReviewerId) {
+        updatePayload.reviewerId = assignedReviewerId;
+        updatePayload.assignedAt = new Date().toISOString();
+        updatePayload.assignedBy = user?.uid || updatedContent?.createdBy || "system";
       }
+
+      await updateDoc(doc(db, "content", updatedContent.id), updatePayload);
+
+      // Confirm assignment via team API if applicable
+      if (assignedReviewerId && user?.role === "admin" && user?.teamId) {
+        try {
+          await fetch(`${API_BASE}/team/assign-reviewer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              adminId: user.uid,
+              contentId: updatedContent.id,
+              reviewerId: assignedReviewerId,
+              teamId: user.teamId,
+            }),
+          });
+        } catch (assignError) {
+          console.error("Error confirming automatic reviewer assignment:", assignError);
+        }
+      }
+
+      // Optimistically update selected content
+      setSelectedContent((prev) =>
+        prev ? { ...prev, ...updatePayload } : prev,
+      );
+
+      // Fetch fresh Review stage items from Firestore
+      try {
+        const uid = auth.currentUser?.uid;
+        const q = query(
+          collection(db, "content"),
+          where("createdBy", "==", uid),
+          where("stage", "==", "Review"),
+          limit(50),
+        );
+        const snapshot = await getDocs(q);
+        const reviewItems = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+        setItems(reviewItems);
+        if (reviewItems.length > 0) {
+          const movedItem =
+            reviewItems.find((item) => item.id === updatedContent.id) ||
+            reviewItems[0];
+          setSelectedContent(movedItem);
+          setValidationResult(movedItem.validation || null);
+          setShowValidationPanel(!!movedItem.validation);
+          setSelectedReviewer(null);
+        }
+      } catch (err) {
+        console.error("Error fetching Review items after fix:", err);
+      }
+
+      setSelectedStage("Review");
+      showAlert(
+        assignedReviewerId
+          ? "Content passed! Moved to Review stage with a reviewer assigned automatically."
+          : "Content passed! Moved to Review stage.",
+        "success",
+      );
+    } else {
+      // Score still below 80 — sync updated validation into items list and selected content
+      const syncedContent = { ...updatedContent, validation: revalidation };
+      setSelectedContent(syncedContent);
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === updatedContent.id
+            ? { ...item, validation: revalidation, title: updatedContent.title, text: updatedContent.text }
+            : item
+        ),
+      );
+      showAlert(
+        "Content improved but score is still below 80. Review the suggestions and apply fixes again.",
+        "warning",
+      );
     }
-  }
-};
+    } finally {
+      setIsFixingAndRevalidating(false);
+    }
+  };
 
   const handleAssignReviewerClick = async () => {
     const effectiveReviewerId =
@@ -481,7 +527,7 @@ const Workflow = () => {
               selectedTemplateName={selectedTemplateName}
               templates={templates}
               isValidating={isValidating}
-              isApplyingFixes={isApplyingFixes}
+              isApplyingFixes={isApplyingFixes || isFixingAndRevalidating}
               showFixesSummary={showFixesSummary}
               fixesSummary={fixesSummary}
               onValidate={handleValidate}

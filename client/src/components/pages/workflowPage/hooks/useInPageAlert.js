@@ -11,7 +11,7 @@ export default function useInPageAlert() {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    setAlertState(naull);
+    setAlertState(null);
   }, []);
 
   const showAlert = useCallback((message, type = "info", duration = DEFAULT_DURATION) => {
