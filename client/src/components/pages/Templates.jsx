@@ -12,6 +12,8 @@ export default function TemplatesPage() {
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [pendingDeleteTemplate, setPendingDeleteTemplate] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [sortBy, setSortBy] = useState("recent");
 
   const buildUsageMapFromContent = useCallback(async () => {
@@ -86,13 +88,30 @@ export default function TemplatesPage() {
 
   // Aminah: Deletes a template and refreshes the list after deletion
 
-  const handleDeleteClick = async (e, itemId) => {
+  const handleDeleteClick = (e, item) => {
     e.stopPropagation();
+    setPendingDeleteTemplate(item);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (isDeleting) return;
+    setPendingDeleteTemplate(null);
+  };
+
+  // Aminah update: Added confirmation step before deleting a template to prevent accidental deletions
+  
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteTemplate?.id) return;
+
+    setIsDeleting(true);
     try {
-      await deleteTemplate(itemId);
-      loadTemplates();
+      await deleteTemplate(pendingDeleteTemplate.id);
+      setPendingDeleteTemplate(null);
+      await loadTemplates();
     } catch (error) {
       console.error("Delete failed:", error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -244,7 +263,7 @@ return (
                     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </div>
                 </button>
-                <button className="action-link delete" onClick={(e) => handleDeleteClick(e, item.id)} aria-label="Delete guideline" title="Delete">
+                <button className="action-link delete" onClick={(e) => handleDeleteClick(e, item)} aria-label="Delete guideline" title="Delete">
                   <div className="action-icon-bg delete-bg">
                     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </div>
@@ -269,6 +288,51 @@ return (
           loadTemplates();
         }}
       />
+
+      {pendingDeleteTemplate && (
+        <div className="modal-overlay">
+          <div
+            className="modal-content delete-confirm-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header delete-confirm-header">
+              <button
+                type="button"
+                className="modal-close"
+                aria-label="Close delete confirmation"
+                onClick={handleCloseDeleteModal}
+                disabled={isDeleting}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="delete-confirm-message">
+                Are you sure you want to delete{" "}
+                <strong>{pendingDeleteTemplate.name || pendingDeleteTemplate.title}</strong>?
+              </p>
+              <div className="modal-actions delete-confirm-actions">
+                <button
+                  type="button"
+                  className="btn-cancel"
+                  onClick={handleCloseDeleteModal}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-save"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
