@@ -979,11 +979,25 @@ const handleUploadContentToDrive = async (item) => {
 
       {/* Edit Modal */}
       {editingId && (
-        <div className="modal-overlay" onClick={handleCloseEdit}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <div
+            className="modal-content"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h3>Edit Content</h3>
-              <button className="modal-close" onClick={handleCloseEdit}>×</button>
+              <button type="button" className="modal-close" onClick={handleCloseEdit}>×</button>
             </div>
             
             <div className="modal-body">
