@@ -162,12 +162,22 @@ const requestAiSuggestions = useCallback(
 
   if (!isOpen) return null;
 
+  // Aminah fix: closes modal only on X or Cancel, not on outside click.
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Create New Content</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          {/* Aminah fix: closes modal only on X click, not on outside click */}
+          <button
+            type="button"
+            className="modal-close"
+            aria-label="Close create content modal"
+            onClick={handleClose}
+          >
+            ×
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="create-content-form">

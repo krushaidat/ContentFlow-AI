@@ -56,6 +56,30 @@ beforeEach(() => {
   mockAddDoc.mockResolvedValue({ id: "new_content_001" });
 });
 
+describe("CreateContent modal closing behavior", () => {
+  test("should stay open on outside click and only close with X or Cancel", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    const view = renderCreateContent({ onClose });
+
+    const overlay = view.container.querySelector(".modal-overlay");
+    expect(overlay).toBeTruthy();
+
+    await user.click(overlay);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /close create content modal/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+    onClose.mockClear();
+
+    renderCreateContent({ onClose });
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 // TC-U09: Content Creation – Save to Firestore
 describe("TC-U09: Content Creation – Save to Firestore", () => {
   test("should call addDoc with correct structure including stage=Draft and createdBy=user.uid", async () => {
