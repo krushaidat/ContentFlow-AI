@@ -822,6 +822,9 @@ const Workflow = () => {
                           </div>
                         )}
                       </div>
+
+                      {/* Abdalaa: keep the back button in normal flex layout
+                          so long titles cannot cover it anymore */}
                       <button
                         className="btn-back"
                         onClick={() => {
