@@ -360,3 +360,118 @@ textarea:focus {
   align-items: center;
   margin-bottom: 12px;
 }
+
+.btn-toggle-history {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-toggle-history:hover {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+
+.compare-view-block {
+  margin-top: 18px;
+  border: 1px solid #e8e7f0;
+  border-radius: 10px;
+  padding: 14px;
+  background: #faf9ff;
+}
+
+.compare-view-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.compare-view-title {
+  margin: 0;
+  font-size: 15px;
+  color: #2e2461;
+}
+
+.compare-version-select {
+  border: 1px solid #d9d4f2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: white;
+  color: #242038;
+}
+
+.compare-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compare-grid.compare-grid-single {
+  grid-template-columns: 1fr;
+}
+
+.compare-card {
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid #ece9fb;
+  background: white;
+}
+
+.current-version-card {
+  min-height: 100%;
+}
+
+.compare-card-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6a628f;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.compare-card p {
+  margin: 6px 0;
+  font-size: 13px;
+}
+
+.compare-changed {
+  background: #fff5cf;
+  border-left: 3px solid #e2a500;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+@media (max-width: 760px) {
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Notification Highlight */
+@keyframes orange-glow {
+  0% {
+    box-shadow: 0 0 0 2px #f97316;
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 2px #f97316;
+  }
+}
+
+.notification-highlight {
+  animation: orange-glow 5s ease-in-out 1;
+}

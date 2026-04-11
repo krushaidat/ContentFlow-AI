@@ -1,14 +1,29 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { collection, getDocs, query, where, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import CreateContent from "../CreateContent";
 import DriveBrowser from "../DriveBrowser";
 import { decrementTemplateUsage } from "../../functions/templateDB";
 import "../styles/dashboard.css";
+import "../styles/review.css";
 import useInPageAlert from "../../hooks/useInPageAlert";
 import InPageAlert from "../InPageAlert";
+
+const auth = getAuth();
+const READY_TO_POST_LABEL = "Ready To Post";
+const READY_TO_POST_STAGE_ALIASES = [
+  READY_TO_POST_LABEL,
+  "Ready to Post",
+  "Ready-To-Post",
+];
+
+const isReadyToPostStage = (stage) =>
+  READY_TO_POST_STAGE_ALIASES.includes(stage);
+
+const normalizeStageLabel = (stage) =>
+  isReadyToPostStage(stage) ? READY_TO_POST_LABEL : stage;
 
 export default function Dashboard() {
   const ALL_STAGES = "All Stages";
@@ -17,7 +32,7 @@ export default function Dashboard() {
   "Draft",
   "Review",
   "Update",
-  "Ready to Post",
+  READY_TO_POST_LABEL,
   "Posted",
 ];
 const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -114,9 +129,20 @@ const handleManualScheduleSubmit = async () => {
   const [selectedStage, setSelectedStage] = useState(ALL_STAGES);//Filter stages
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const [editingId, setEditingId] = useState(null);
   const [editingContent, setEditingContent] = useState({ title: "", text: "", stage: "Draft" });
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  // Aminah updated: state for the version history modal — which item is open, which snapshot index is selected, and whether to view or compare.
+  const [historyItem, setHistoryItem] = useState(null);
+  const [historyVersionIndex, setHistoryVersionIndex] = useState(-1);
+  const [historyViewMode, setHistoryViewMode] = useState("view");
+  const [isRevertingHistory, setIsRevertingHistory] = useState(false);
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+  const [pendingHighlightId, setPendingHighlightId] = useState(null);
+  const [highlightedContentId, setHighlightedContentId] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const menuRef = useRef(null);
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
   const [templateTitles, setTemplateTitles] = useState([]);
   // Drive browser modal visibility
@@ -129,37 +155,6 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
 
   // Abdalaa: This stores any scheduling error message from the AI suggestion flow.
   const [scheduleError, setScheduleError] = useState(null);
-  const auth = getAuth();
-  /** DRAVEN
-   * Sets up an authentication state listener using Firebase's onAuthStateChanged function.
-   * When the authentication state changes (e.g., user signs in or out), this listener is triggered.
-   * If a user is authenticated, it fetches the user's content from Firestore.
-   * If no user is authenticated, it sets an error message and redirects to the login page.
-   * The listener is cleaned up when the component unmounts to prevent memory leaks.
-   */
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      if (user) {
-        // Only fetch content if user is authenticated
-        // Prevents "User not authenticated" errors
-        fetchContent();
-        fetchTemplateTitles();
-      } else {
-        setLoading(false);
-        setError("Please sign in to view your content");
-        navigate("/login");
-      }
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
-  
-  useEffect(() => {
-    if (selectedStage) {
-      fetchContent();
-    }
-  }, [selectedStage]);
   /** DRAVEN
    * Fetches content from Firestore for the authenticated user.
    * @param {*} user - The authenticated user object.
@@ -176,7 +171,7 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
    * Instead, sorting is done client-side after fetching to improve performance and reduce quota errors.
    - This ensures users can only access their own content, enforcing data privacy and security.
    */
-  const fetchContent = async (user) => {
+  const fetchContent = useCallback(async (user) => {
     const currentUser = user || auth.currentUser;
     if (!currentUser) {
       setError("User not authenticated");
@@ -189,7 +184,11 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
       // This matches Firestore security rules that allow reading only own documents
       const filters = [where("createdBy", "==", currentUser.uid)];
       if (selectedStage && selectedStage !== ALL_STAGES) {
-        filters.push(where("stage", "==", selectedStage));
+        if (isReadyToPostStage(selectedStage)) {
+          filters.push(where("stage", "in", READY_TO_POST_STAGE_ALIASES));
+        } else {
+          filters.push(where("stage", "==", selectedStage));
+        }
       }
       const q = query(
         collection(db, "content"),
@@ -198,10 +197,14 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
       const querySnapshot = await getDocs(q);
       // Performance fix: Sort on client-side instead of orderBy in query
       // Avoids needing a composite index and reduces quota errors
-      const items = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const items = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          stage: normalizeStageLabel(data.stage),
+        };
+      }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setContent(items);
       setError(null);
     } catch (err) {
@@ -210,6 +213,90 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
     } finally {
       setLoading(false);
     }
+  }, [ALL_STAGES, selectedStage]);
+
+  /** DRAVEN
+   * Sets up an authentication state listener using Firebase's onAuthStateChanged function.
+   * When the authentication state changes (e.g., user signs in or out), this listener is triggered.
+   * If a user is authenticated, it fetches the user's content from Firestore.
+   * If no user is authenticated, it sets an error message and redirects to the login page.
+   * The listener is cleaned up when the component unmounts to prevent memory leaks.
+   */
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        fetchContent(currentUser);
+        fetchTemplateTitles();
+      } else {
+        setLoading(false);
+        setError("Please sign in to view your content");
+        navigate("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [fetchContent, navigate]);
+  
+  useEffect(() => {
+    if (selectedStage) {
+      fetchContent();
+    }
+  }, [fetchContent, selectedStage]);
+
+  useEffect(() => {
+    const targetId = location.state?.highlightContentId;
+    if (!targetId) return;
+
+    // Ensure the highlighted item is visible in the dashboard list.
+    setSearch("");
+    setSelectedStage(ALL_STAGES);
+    setHighlightedContentId(null);
+    setPendingHighlightId(null);
+
+    const frameId = window.requestAnimationFrame(() => {
+      setPendingHighlightId(targetId);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [ALL_STAGES, location.state?.highlightContentId, location.state?.notificationId]);
+
+  useEffect(() => {
+    if (!pendingHighlightId || content.length === 0) return;
+
+    const exists = content.some((item) => item.id === pendingHighlightId);
+    if (!exists) return;
+
+    setHighlightedContentId(pendingHighlightId);
+    const el = document.getElementById(`dashboard-content-${pendingHighlightId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    const timer = setTimeout(() => {
+      setHighlightedContentId(null);
+    }, 5000);
+
+    setPendingHighlightId(null);
+    return () => clearTimeout(timer);
+  }, [pendingHighlightId, content]);
+
+
+  // Aminah: content menu click outside handler
+  useEffect(() => {
+    const handleClickOutsideMenu = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutsideMenu);
+    return () => document.removeEventListener("mousedown", handleClickOutsideMenu);
+  }, []);
+
+  const toggleContentMenu = (e, contentId) => {
+    e.stopPropagation();
+    setOpenMenuId((currentId) => (currentId === contentId ? null : contentId));
   };
 
   const fetchTemplateTitles = async () => {
@@ -282,6 +369,108 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
   const handleDeleteClick = (e, contentId) => {
     e.stopPropagation();
     setPendingDeleteId(contentId);
+  };
+
+  // Aminah update: open the content version history modal from a dashboard card.
+  const handleViewHistory = (e, item) => {
+    e.stopPropagation();
+    const history = Array.isArray(item.versionHistory) ? item.versionHistory : [];
+    setHistoryVersionIndex(history.length > 0 ? history.length - 1 : -1);
+    setHistoryViewMode("view");
+    setShowRevertConfirm(false);
+    setHistoryItem(item);
+  };
+  
+  // Aminah update: open the content version history modal in compare mode, which highlights field changes between the selected snapshot and the current version.
+
+  const closeHistoryModal = () => {
+    setHistoryItem(null);
+    setHistoryVersionIndex(-1);
+    setHistoryViewMode("view");
+    setShowRevertConfirm(false);
+  };
+
+  // Aminah updated: format a versionHistory snapshotAt timestamp into a readable locale string.
+  const formatHistoryTimestamp = (value) => {
+    if (!value) return "Unknown time";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "Unknown time" : parsed.toLocaleString();
+  };
+
+  // Aminah updated: returns true when a specific field differs between a past snapshot and the current item, used to highlight changed fields in compare mode.
+  const historyFieldChanged = (snapshot, field, current) =>
+    (snapshot?.[field] || "") !== (current?.[field] || "");
+
+  const handleRevertHistoryVersion = () => {
+    const history = Array.isArray(historyItem?.versionHistory)
+      ? historyItem.versionHistory
+      : [];
+    const selectedSnapshot =
+      historyVersionIndex >= 0 && historyVersionIndex < history.length
+        ? history[historyVersionIndex]
+        : null;
+
+    if (!historyItem || !selectedSnapshot || !user?.uid) {
+      showAlert("Select a saved version to revert to first.", "warning");
+      return;
+    }
+
+  // Aminah updated: when the user clicks "Revert to this version", show a confirmation popup before actually reverting, to prevent accidental reverts.
+    setShowRevertConfirm(true);
+  };
+
+  const confirmRevertHistoryVersion = async () => {
+    const history = Array.isArray(historyItem?.versionHistory)
+      ? historyItem.versionHistory
+      : [];
+    const selectedSnapshot =
+      historyVersionIndex >= 0 && historyVersionIndex < history.length
+        ? history[historyVersionIndex]
+        : null;
+
+    if (!historyItem || !selectedSnapshot || !user?.uid) {
+      setShowRevertConfirm(false);
+      showAlert("Select a saved version to revert to first.", "warning");
+      return;
+    }
+
+    try {
+      setShowRevertConfirm(false);
+      setIsRevertingHistory(true);
+
+      const response = await fetch("http://localhost:5000/api/team/content-update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          authorId: user.uid,
+          contentId: historyItem.id,
+          title: selectedSnapshot.title || "",
+          text: selectedSnapshot.text || "",
+          stage: selectedSnapshot.stage || "Draft",
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to revert version");
+      }
+
+      await fetchContent(user);
+      closeHistoryModal();
+      showAlert(
+        data.assignedReviewerId
+          ? "Version reverted successfully and reviewer assignment was restored."
+          : "Version reverted successfully.",
+        "success"
+      );
+    } catch (revertError) {
+      console.error("Error reverting content version:", revertError);
+      showAlert(revertError.message || "Failed to revert version.", "error");
+    } finally {
+      setIsRevertingHistory(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -359,17 +548,40 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
    */
   const handleSaveChanges = async () => {
     try {
-      const contentRef = doc(db, "content", editingId);
-      await updateDoc(contentRef, {
-        title: editingContent.title,
-        text: editingContent.text,
-        stage: editingContent.stage,
+      const response = await fetch("http://localhost:5000/api/team/content-update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          authorId: user?.uid,
+          contentId: editingId,
+          title: editingContent.title,
+          text: editingContent.text,
+          stage: editingContent.stage,
+        }),
       });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update content");
+      }
+
       setEditingId(null);
       fetchContent(user);
+      if (editingContent.stage === "Review") {
+        showAlert(
+          data.assignedReviewerId
+            ? "Content moved to Review and a reviewer was assigned automatically."
+            : "Content moved to Review.",
+          "success"
+        );
+      } else {
+        showAlert("Content updated successfully.", "success");
+      }
     } catch (error) {
       console.error("Error updating content:", error);
-      setError("Failed to update content");
+      setError(error.message || "Failed to update content");
     }
   };
 
@@ -644,39 +856,88 @@ const handleUploadContentToDrive = async (item) => {
       ) : (
         <div className="dashboard-content-list">
           {filteredContent.map((item) => (
-            <div key={item.id} className="dashboard-content-card content-item-box">
+            <div
+              id={`dashboard-content-${item.id}`}
+              key={item.id}
+              className={`dashboard-content-card content-item-box ${highlightedContentId === item.id ? "notification-highlight" : ""}`}
+            >
               {/* AMINAH: Content item box container */}
               <div className="dashboard-content-header">
                 <span className={`dashboard-badge ${getStatusBadgeClass(item.stage)}`}>{item.stage || "Draft"}</span>
                 {/*- Moved edit and delete buttons from `.dashboard-content-actions` at the bottom to `.dashboard-content-header` at the top
                   - Buttons now positioned at top-right of each card*/}
-                <div className="dashboard-content-actions">
+                <div className="dashboard-content-actions" ref={openMenuId === item.id ? menuRef : null}>
                   <button
-                    className="icon-btn upload"
-                    onClick={() => handleUploadContentToDrive(item)}
-                    title="Upload to Drive"
-                    disabled={driveUploadingId === item.id}
+                    type="button"
+                    className="icon-btn more"
+                    onClick={(e) => toggleContentMenu(e, item.id)}
+                    title="More options"
+                    aria-label={`More options for ${item.title || "content"}`}
+                    aria-haspopup="menu"
+                    aria-expanded={openMenuId === item.id}
                   >
-                    {driveUploadingId === item.id ? (
-                      <svg className="icon-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="9" strokeOpacity="0.25" />
-                        <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" />
-                      </svg>
-                    ) : (
-                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M 0 16 L 0 24 L 24 24 L 24 16 L 22 16 L 22 22 L 2 22 L 2 16 L 0 16 L 0 16 M 8 19 L 16 19 L 16 14 L 16 12 L 20 12 L 12 2 L 12 2 L 4 12 L 8 12 L 8 19 Z"/></svg>
-                    )}
+                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <circle cx="12" cy="5" r="1.75" fill="currentColor" stroke="none" />
+                      <circle cx="12" cy="12" r="1.75" fill="currentColor" stroke="none" />
+                      <circle cx="12" cy="19" r="1.75" fill="currentColor" stroke="none" />
+                    </svg>
                   </button>
-                  <button className="icon-btn edit" onClick={(e) => handleEditClick(e, item)} title="Edit">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  </button>
-                  <button className="icon-btn delete" onClick={(e) => handleDeleteClick(e, item.id)} title="Delete">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
+
+                  {openMenuId === item.id && (
+                    <div className="dashboard-content-menu" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="dashboard-content-menu-item"
+                        onClick={(e) => {
+                          setOpenMenuId(null);
+                          handleViewHistory(e, item);
+                        }}
+                      >
+                        Version History
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="dashboard-content-menu-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                          handleUploadContentToDrive(item);
+                        }}
+                        disabled={driveUploadingId === item.id}
+                      >
+                        {driveUploadingId === item.id ? "Uploading..." : "Upload to Drive"}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="dashboard-content-menu-item"
+                        onClick={(e) => {
+                          setOpenMenuId(null);
+                          handleEditClick(e, item);
+                        }}
+                      >
+                        Edit Content
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="dashboard-content-menu-item danger"
+                        onClick={(e) => {
+                          setOpenMenuId(null);
+                          handleDeleteClick(e, item.id);
+                        }}
+                      >
+                        Delete Content
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="content-item-title">{item.title}</div>
               <div className="content-item-text">{item.text}</div>
-              {item.rejectionReason && item.stage !== "Ready to Post" && (
+              {item.rejectionReason && !isReadyToPostStage(item.stage) && (
                 <div className="rejection-reason">
                   <strong>Feedback:</strong> {item.rejectionReason}
                 </div>
@@ -689,7 +950,7 @@ const handleUploadContentToDrive = async (item) => {
               
                 {/* Abdalaa: I only want the scheduling buttons to show
                     once the post is actually in the Ready to Post stage. */}
-                {item.stage === "Ready to Post" && (
+                {isReadyToPostStage(item.stage) && (
   <div className="schedule-actions-row">
     <button
       className="schedule-action-btn ai-schedule-btn"
@@ -762,7 +1023,7 @@ const handleUploadContentToDrive = async (item) => {
                     <option value="Planning">Planning</option>
                     <option value="Review">Review</option>
                     <option value="Update">Update</option>
-                    <option value="Ready to Post">Ready to Post</option>
+                    <option value="Ready To Post">Ready To Post</option>
                   </select>
                 </div>
                 
@@ -929,6 +1190,175 @@ const handleUploadContentToDrive = async (item) => {
           </div>
         </div>
       )}
+
+      {/* Aminah updated: version history modal — shows past snapshots for the selected content item with optional compare mode. */}
+      {historyItem && (() => {
+        const history = Array.isArray(historyItem.versionHistory) ? historyItem.versionHistory : [];
+        const selectedSnapshot =
+          historyVersionIndex >= 0 && historyVersionIndex < history.length
+            ? history[historyVersionIndex]
+            : null;
+
+        return (
+          <div className="modal-overlay" onClick={closeHistoryModal}>
+            <div className="modal-content history-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Version History</h3>
+                <button className="modal-close" onClick={closeHistoryModal}>×</button>
+              </div>
+              <div className="modal-body">
+                <p style={{ marginBottom: 12 }}>
+                  <strong>{historyItem.title}</strong>
+                  <span className="history-version-count">
+                    {history.length === 0 ? " — no past versions yet" : ` — ${history.length} saved version${history.length === 1 ? "" : "s"}`}
+                  </span>
+                </p>
+
+                <div className="compare-view-header-row" style={{ marginBottom: 12, justifyContent: "flex-end" }}>
+                  {selectedSnapshot && (
+                    <div className="history-view-toggle">
+                      <button
+                        type="button"
+                        className={`history-toggle-btn ${historyViewMode === "view" ? "active" : ""}`}
+                        onClick={() => {
+                          setHistoryViewMode("view");
+                          setShowRevertConfirm(false);
+                        }}
+                      >
+                        View version
+                      </button>
+                      <button
+                        type="button"
+                        className={`history-toggle-btn ${historyViewMode === "compare" ? "active" : ""}`}
+                        onClick={() => {
+                          setHistoryViewMode("compare");
+                          setShowRevertConfirm(false);
+                        }}
+                      >
+                        Compare
+                      </button>
+                    </div>
+                  )}
+                  <select
+                    className="compare-version-select"
+                    value={historyVersionIndex}
+                    onChange={(e) => {
+                      setHistoryVersionIndex(Number(e.target.value));
+                      setHistoryViewMode("view");
+                      setShowRevertConfirm(false);
+                    }}
+                  >
+                    <option value={-1}>Current version only</option>
+                    {history.map((version, idx) => (
+                      <option key={`${version.snapshotAt || "v"}-${idx}`} value={idx}>
+                        {`v${idx + 1} · ${formatHistoryTimestamp(version.snapshotAt)} · ${
+                          version.changeType === "manual_edit" ? "Manual edit"
+                          : version.changeType === "review_approved" ? "Approved"
+                          : version.changeType === "review_rejected" ? "Rejected"
+                          : version.changeType || "Edit"
+                        }`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {historyViewMode === "view" && selectedSnapshot ? (
+                  <div className="compare-grid compare-grid-single">
+                    <div className="compare-card old-version">
+                      <div className="compare-card-title">Past Version (v{historyVersionIndex + 1})</div>
+                      <p>
+                        <strong>Title:</strong> {selectedSnapshot.title || "(empty)"}
+                      </p>
+                      <p>
+                        <strong>Stage:</strong> {selectedSnapshot.stage || "Draft"}
+                      </p>
+                      <p>
+                        <strong>Text:</strong> {selectedSnapshot.text || "(empty)"}
+                      </p>
+                      <p className="history-snapshot-meta">Saved: {formatHistoryTimestamp(selectedSnapshot.snapshotAt)}</p>
+                      {selectedSnapshot.reason && <p className="history-snapshot-meta">Reason: {selectedSnapshot.reason}</p>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`compare-grid ${selectedSnapshot ? "" : "compare-grid-single"}`}>
+                    {selectedSnapshot && (
+                      <div className="compare-card old-version">
+                        <div className="compare-card-title">Past Version (v{historyVersionIndex + 1})</div>
+                        <p className={historyFieldChanged(selectedSnapshot, "title", historyItem) ? "compare-changed" : ""}>
+                          <strong>Title:</strong> {selectedSnapshot.title || "(empty)"}
+                        </p>
+                        <p className={historyFieldChanged(selectedSnapshot, "stage", historyItem) ? "compare-changed" : ""}>
+                          <strong>Stage:</strong> {selectedSnapshot.stage || "Draft"}
+                        </p>
+                        <p className={historyFieldChanged(selectedSnapshot, "text", historyItem) ? "compare-changed" : ""}>
+                          <strong>Text:</strong> {selectedSnapshot.text || "(empty)"}
+                        </p>
+                        <p className="history-snapshot-meta">Saved: {formatHistoryTimestamp(selectedSnapshot.snapshotAt)}</p>
+                        {selectedSnapshot.reason && <p className="history-snapshot-meta">Reason: {selectedSnapshot.reason}</p>}
+                      </div>
+                    )}
+
+                    <div className="compare-card new-version current-version-card">
+                      <div className="compare-card-title">Current Version</div>
+                      <p className={selectedSnapshot && historyFieldChanged(selectedSnapshot, "title", historyItem) ? "compare-changed" : ""}>
+                        <strong>Title:</strong> {historyItem.title || "(empty)"}
+                      </p>
+                      <p className={selectedSnapshot && historyFieldChanged(selectedSnapshot, "stage", historyItem) ? "compare-changed" : ""}>
+                        <strong>Stage:</strong> {historyItem.stage || "Draft"}
+                      </p>
+                      <p className={selectedSnapshot && historyFieldChanged(selectedSnapshot, "text", historyItem) ? "compare-changed" : ""}>
+                        <strong>Text:</strong> {historyItem.text || "(empty)"}
+                      </p>
+                      <p className="history-snapshot-meta">Last updated: {historyItem.updatedAt ? formatHistoryTimestamp(historyItem.updatedAt) : historyItem.createdAt ? formatDate(historyItem.createdAt) : "Unknown"}</p>
+                    </div>
+                  </div>
+                )}
+
+                {history.length === 0 && (
+                  <div className="history-empty-hint">
+                    Version snapshots are created automatically whenever you edit and save this content or a reviewer makes a decision.
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ justifyContent: "space-between", gap: 12 }}>
+                <button
+                  type="button"
+                  className="btn-warning"
+                  onClick={handleRevertHistoryVersion}
+                  disabled={!selectedSnapshot || isRevertingHistory}
+                >
+                  {isRevertingHistory ? "Reverting..." : "Revert to this version"}
+                </button>
+                <button className="btn-secondary" onClick={closeHistoryModal}>Close</button>
+              </div>
+
+              {showRevertConfirm && selectedSnapshot && (
+                <div className="history-confirm-overlay" onClick={() => setShowRevertConfirm(false)}>
+                  <div className="history-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                    <h4>Revert to version v{historyVersionIndex + 1}?</h4>
+                    <p>
+                      This will replace the current title, stage, and text with the selected saved version.
+                    </p>
+                    <div className="history-confirm-actions">
+                      <button type="button" className="btn-cancel" onClick={() => setShowRevertConfirm(false)}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-warning"
+                        onClick={confirmRevertHistoryVersion}
+                        disabled={isRevertingHistory}
+                      >
+                        {isRevertingHistory ? "Reverting..." : "Yes, revert version"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { fetchTemplates, deleteTemplate } from "../../functions/templateDB";
 import CreateTemplate from "../../functions/CreateTemplate";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../../firebase";
 import "../styles/templatesPage.css";
@@ -14,7 +14,7 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [sortBy, setSortBy] = useState("recent");
 
-  const buildUsageMapFromContent = async () => {
+  const buildUsageMapFromContent = useCallback(async () => {
     const auth = getAuth();
     const currentUser = auth.currentUser || await new Promise((resolve) => {
       const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -36,9 +36,9 @@ export default function TemplatesPage() {
     });
 
     return usageMap;
-  };
+  }, []);
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       const [templateData, usageMap] = await Promise.all([
         fetchTemplates(),
@@ -56,13 +56,27 @@ export default function TemplatesPage() {
     } catch (error) {
       console.error("Failed to load templates:", error);
     }
-  };
+  }, [buildUsageMapFromContent]);
 
   // Aminah: Load templates when the component mounts
 
+
+  // Aminah update: Set up real-time syncing with Firestore using onSnapshot
+
   useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "templates"),
+      () => {
+        loadTemplates();
+      },
+      (error) => {
+        console.error("Failed to sync templates in real time:", error);
+      },
+    );
+
     loadTemplates();
-  }, []);
+    return unsubscribe;
+  }, [loadTemplates]);
 
   const handleEditClick = (e, item) => {
     e.stopPropagation();
@@ -146,6 +160,16 @@ export default function TemplatesPage() {
       return compareByName(a, b);
     }
 
+    /* Aminah update: added option to sort by oldest first
+      - Sorts templates by their creation or last updated date in ascending order (oldest first).
+    */
+
+    if (sortBy === "oldest") {
+      const recencyDiff = getTemplateRecency(a) - getTemplateRecency(b);
+      if (recencyDiff !== 0) return recencyDiff;
+      return compareByName(a, b);
+    }
+
     // default: recent
     const recencyDiff = getTemplateRecency(b) - getTemplateRecency(a);
     if (recencyDiff !== 0) return recencyDiff;
@@ -181,6 +205,7 @@ return (
             aria-label="Sort guidelines"
           >
             <option value="recent">Recent</option>
+            <option value="oldest">Oldest</option>
             <option value="name">Name</option>
             <option value="popular">Most popular</option>
           </select>

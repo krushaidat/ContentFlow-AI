@@ -6,7 +6,9 @@
  * automatic fixes, and reviewer assignment.
  */
 
+
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   collection,
   getDocs,
@@ -15,7 +17,6 @@ import {
   limit,
   updateDoc,
   doc,
-  getDoc,
 } from "firebase/firestore";
 import { db, auth } from "../../../firebase";
 import { useAuth } from "../../../hooks/useAuth";
@@ -35,22 +36,22 @@ import { useReviewers } from "./hooks/useReviewers";
 
 // Components
 import ContentList from "./components/ContentList";
+import ContentViewModal from "./components/Contentviewmodal";
 import ValidationPanel from "./components/ValidationPanel";
 import ReviewerCard from "./components/ReviewerCard";
-import ContentViewModal from "./components/ContentViewModal";
 
 // Constants
-import { STAGES, API_BASE } from "./constants";
+import { API_BASE, STAGES } from "./constants";
 
 // Styles
 import "../../styles/workflow.css";
 
 const Workflow = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const { alertState, showAlert, dismissAlert } = useInPageAlert();
-
-  // View modal state
-  const [viewContent, setViewContent] = useState(null);
+  const [highlightedContentId, setHighlightedContentId] = useState(null);
+  const [viewingContent, setViewingContent] = useState(null);
 
   // Content management
   const {
@@ -110,10 +111,30 @@ const Workflow = () => {
   const selectedTemplateName =
     templates.find((t) => t.id === selectedTemplateId)?.name || "None";
 
-  // ---- Effects ----
+  
+
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  /* Aminah update: Highlight content when navigated from a notification or link */
+
+  useEffect(() => {
+    const targetId = location.state?.highlightContentId;
+    if (!targetId) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      setHighlightedContentId(targetId);
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedContentId(null);
+    }, 5000);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timer);
+    };
+  }, [location.state?.highlightContentId, location.state?.notificationId]);
 
   useEffect(() => {
     fetchContent(selectedStage);
@@ -124,14 +145,20 @@ const Workflow = () => {
     if (selectedStage === "Review" && user?.role === "admin") {
       fetchReviewers(user);
     }
-  }, [selectedStage, user?.role, user?.uid]);
+  }, [
+    selectedStage,
+    user,
+    fetchContent,
+    fetchReviewers,
+    setValidationResult,
+    setShowValidationPanel,
+    setShowFixesSummary,
+  ]);
 
   useEffect(() => {
-    // Aminah Update: fetch current reviewer name when content changes, prioritizing reviewerId then suggestedReviewerId
-    const reviewerId =
-      selectedContent?.reviewerId || selectedContent?.suggestedReviewerId;
+    const reviewerId = selectedContent?.reviewerId;
     fetchReviewerName(reviewerId);
-  }, [selectedContent?.reviewerId, selectedContent?.suggestedReviewerId]);
+  }, [selectedContent?.reviewerId, fetchReviewerName]);
 
   // ---- Wrapped handlers ----
   const handleValidate = async () => {
@@ -147,6 +174,7 @@ const Workflow = () => {
         collection,
         query,
         getDocs,
+        user?.teamId || null,
       );
       const assignedReviewerId = await assignReviewerWithGemini(
         selectedContent,
@@ -161,10 +189,29 @@ const Workflow = () => {
       };
 
       if (assignedReviewerId) {
-        updatePayload.suggestedReviewerId = assignedReviewerId;
+        updatePayload.reviewerId = assignedReviewerId;
+        updatePayload.assignedAt = new Date().toISOString();
+        updatePayload.assignedBy = user?.uid || selectedContent?.createdBy || "system";
       }
 
       await updateDoc(doc(db, "content", selectedContent.id), updatePayload);
+
+      if (assignedReviewerId && user?.role === "admin" && user?.teamId) {
+        try {
+          await fetch(`${API_BASE}/team/assign-reviewer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              adminId: user.uid,
+              contentId: selectedContent.id,
+              reviewerId: assignedReviewerId,
+              teamId: user.teamId,
+            }),
+          });
+        } catch (assignError) {
+          console.error("Error confirming automatic reviewer assignment:", assignError);
+        }
+      }
       setSelectedContent((prev) =>
         prev ? { ...prev, ...updatePayload } : prev,
       );
@@ -201,7 +248,7 @@ const Workflow = () => {
 
       showAlert(
         assignedReviewerId
-          ? "Content passed! Moved to Review stage with reviewer preselected. Click Assign Reviewer to confirm."
+          ? "Content passed! Moved to Review stage with a reviewer assigned automatically."
           : "Content passed! Moved to Review stage.",
         "success",
       );
@@ -366,6 +413,11 @@ const Workflow = () => {
     setShowFixesSummary(false);
   };
 
+  const handleViewContent = (item) => {
+    handleSelectContent(item);
+    setViewingContent(item);
+  };
+
   // ---- Render ----
   return (
     <div className="workflow-bg">
@@ -412,9 +464,10 @@ const Workflow = () => {
             error={error}
             selectedContent={selectedContent}
             onSelectContent={handleSelectContent}
-            onViewContent={(item) => setViewContent(item)}
+            onViewContent={handleViewContent}
             onStageChange={setSelectedStage}
             STAGES={STAGES}
+            highlightedContentId={highlightedContentId}
           />
 
           {/* RIGHT — Panels */}
@@ -462,13 +515,10 @@ const Workflow = () => {
         </p>
       </div>
 
-      {/* Content View Modal */}
-      {viewContent && (
-        <ContentViewModal
-          content={viewContent}
-          onClose={() => setViewContent(null)}
-        />
-      )}
+      <ContentViewModal
+        content={viewingContent}
+        onClose={() => setViewingContent(null)}
+      />
     </div>
   );
 };
