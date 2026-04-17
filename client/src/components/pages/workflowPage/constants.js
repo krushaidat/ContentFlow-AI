@@ -17,7 +17,6 @@ export const normalizeStageLabel = (stage) =>
 
 export const STAGES = [
   "Draft",
-  "Planning",
   "Review",
   "Update",
   READY_TO_POST_STAGE,
