@@ -210,14 +210,29 @@ const [driveUploadingId, setDriveUploadingId] = useState(null);
       const querySnapshot = await getDocs(q);
       // Performance fix: Sort on client-side instead of orderBy in query
       // Avoids needing a composite index and reduces quota errors
-      const items = querySnapshot.docs.map((doc) => {
+      const mappedItems = querySnapshot.docs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,
           ...data,
           stage: normalizeStageLabel(data.stage),
         };
-      }).sort((a, b) => toComparableTimestamp(b.createdAt) - toComparableTimestamp(a.createdAt));
+      });
+
+      // When viewing the Update stage, the creator wants the most recently
+      // rejected items first so the freshest feedback is always on top.
+      // Fall back to createdAt when rejectedAt is missing (legacy data).
+      const isUpdateView = selectedStage === "Update";
+      const items = mappedItems.sort((a, b) => {
+        if (isUpdateView) {
+          const aRejected = toComparableTimestamp(a.rejectedAt) || toComparableTimestamp(a.reviewedAt);
+          const bRejected = toComparableTimestamp(b.rejectedAt) || toComparableTimestamp(b.reviewedAt);
+          if (aRejected || bRejected) {
+            return bRejected - aRejected;
+          }
+        }
+        return toComparableTimestamp(b.createdAt) - toComparableTimestamp(a.createdAt);
+      });
       setContent(items);
       setError(null);
     } catch (err) {

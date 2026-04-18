@@ -4,6 +4,18 @@ const { createNotification, buildDisplayName } = require("../utils/notificationS
 
 const normalizeStageValue = (value) => String(value || "").trim().toLowerCase();
 
+/**
+ * Review status
+ *   ASSIGNED → newly assigned to reviewer (no decision yet)
+ *   APPROVED → approved by reviewer
+ *   REJECTED → rejected with feedback
+ */
+const REVIEW_STATUS = Object.freeze({
+  ASSIGNED: "ASSIGNED",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+});
+
 async function findAutoReviewerForTeam(teamId, excludeUserId = null) {
   if (!teamId) {
     return null;
@@ -78,13 +90,11 @@ exports.addMemberToTeam = async (req, res) => {
   try {
     const { adminId, memberEmail, teamId } = req.body;
 
-    // Validate inputs
     if (!adminId || !memberEmail || !teamId) {
       console.log("ERROR: Missing required fields");
       return res.status(400).json({ error: "adminId, memberEmail, and teamId are required" });
     }
 
-    // Verify the requesting user is an admin
     console.log("Verifying admin status for user:", adminId);
     const adminRef = db.collection("Users").doc(adminId);
     const adminDoc = await adminRef.get();
@@ -100,13 +110,11 @@ exports.addMemberToTeam = async (req, res) => {
       return res.status(403).json({ error: "Only admins can add team members" });
     }
 
-    // Verify admin owns this team
     if (adminData.teamId !== teamId) {
       console.log("ERROR: Admin does not have access to this team");
       return res.status(403).json({ error: "Admin does not have access to this team" });
     }
 
-    // Find the user to add by email
     console.log("Finding user with email:", memberEmail.toLowerCase());
     const memberQuery = await db
       .collection("Users")
@@ -122,7 +130,6 @@ exports.addMemberToTeam = async (req, res) => {
     const memberId = memberDoc.id;
     console.log("Found user:", memberId);
 
-    // Add member to team
     console.log("Adding user to team:", teamId);
     await db.collection("Users").doc(memberId).update({
       teamId: teamId,
@@ -153,20 +160,17 @@ exports.changeMemberRole = async (req, res) => {
   try {
     const { adminId, memberId, newRole, teamId } = req.body;
 
-    // Validate inputs
     if (!adminId || !memberId || !newRole || !teamId) {
       console.log("ERROR: Missing required fields");
       return res.status(400).json({ error: "adminId, memberId, newRole, and teamId are required" });
     }
 
-    // Validate role
     const validRoles = ["user", "author", "reviewer", "admin"];
     if (!validRoles.includes(newRole)) {
       console.log("ERROR: Invalid role:", newRole);
       return res.status(400).json({ error: "Invalid role. Must be one of: user, author, reviewer, admin" });
     }
 
-    // Verify the requesting user is an admin
     console.log("Verifying admin status for user:", adminId);
     const adminRef = db.collection("Users").doc(adminId);
     const adminDoc = await adminRef.get();
@@ -181,14 +185,11 @@ exports.changeMemberRole = async (req, res) => {
       console.log("ERROR: User is not an admin, role:", adminData.role);
       return res.status(403).json({ error: "Only admins can change member roles" });
     }
-
-    // Verify admin owns this team
     if (adminData.teamId !== teamId) {
       console.log("ERROR: Admin does not have access to this team");
       return res.status(403).json({ error: "Admin does not have access to this team" });
     }
 
-    // Verify the member exists and belongs to the team
     console.log("Verifying member:", memberId);
     const memberRef = db.collection("Users").doc(memberId);
     const memberDoc = await memberRef.get();
@@ -204,7 +205,6 @@ exports.changeMemberRole = async (req, res) => {
       return res.status(403).json({ error: "Member does not belong to this team" });
     }
 
-    // Update member role
     console.log("Updating member role to:", newRole);
     await db.collection("Users").doc(memberId).update({
       role: newRole,
@@ -234,13 +234,11 @@ exports.assignReviewerToContent = async (req, res) => {
   try {
     const { adminId, contentId, reviewerId, teamId } = req.body;
 
-    // Validate inputs
     if (!adminId || !contentId || !reviewerId || !teamId) {
       console.log("ERROR: Missing required fields");
       return res.status(400).json({ error: "adminId, contentId, reviewerId, and teamId are required" });
     }
 
-    // Verify the requesting user is an admin
     console.log("Verifying admin status for user:", adminId);
     const adminRef = db.collection("Users").doc(adminId);
     const adminDoc = await adminRef.get();
@@ -255,14 +253,11 @@ exports.assignReviewerToContent = async (req, res) => {
       console.log("ERROR: User is not an admin, role:", adminData.role);
       return res.status(403).json({ error: "Only admins can assign reviewers" });
     }
-
-    // Verify admin owns this team
     if (adminData.teamId !== teamId) {
       console.log("ERROR: Admin does not have access to this team");
       return res.status(403).json({ error: "Admin does not have access to this team" });
     }
 
-    // Verify the reviewer exists and belongs to the team
     console.log("Verifying reviewer:", reviewerId);
     const reviewerRef = db.collection("Users").doc(reviewerId);
     const reviewerDoc = await reviewerRef.get();
@@ -283,7 +278,6 @@ exports.assignReviewerToContent = async (req, res) => {
       return res.status(403).json({ error: "Only users with reviewer role can be assigned as reviewers" });
     }
 
-    // Verify the content exists
     console.log("Verifying content:", contentId);
     const contentRef = db.collection("content").doc(contentId);
     const contentDoc = await contentRef.get();
@@ -295,12 +289,15 @@ exports.assignReviewerToContent = async (req, res) => {
 
     const contentData = contentDoc.data() || {};
 
-    // Assign reviewer to content
+    // Seed reviewStatusCode = ASSIGNED so downstream filters have a clear status
+    // from the moment of assignment. Do NOT overwrite existing reviewStatus (lowercase)
+    // to preserve backward compatibility with legacy readers.
     console.log("Assigning reviewer to content");
     await db.collection("content").doc(contentId).update({
       reviewerId: reviewerId,
       assignedAt: new Date().toISOString(),
       assignedBy: adminId,
+      reviewStatusCode: REVIEW_STATUS.ASSIGNED,
     });
 
     if (reviewerId) {
@@ -381,10 +378,12 @@ exports.submitReviewDecision = async (req, res) => {
       return res.status(403).json({ error: "You are not assigned to review this content" });
     }
 
+    const nowIso = new Date().toISOString();
+
     const updatePayload = {
-      reviewedAt: new Date().toISOString(),
+      reviewedAt: nowIso,
       reviewedBy: reviewerId,
-      reviewStatus: decision,
+      reviewStatus: decision, // legacy lowercase field, preserved
     };
 
     // Aminah updated: build a snapshot of the content before the review decision is applied so it can be stored in versionHistory for the author to view later.
@@ -392,7 +391,7 @@ exports.submitReviewDecision = async (req, res) => {
       title: contentData.title || "",
       text: contentData.text || "",
       stage: contentData.stage || "Draft",
-      snapshotAt: new Date().toISOString(),
+      snapshotAt: nowIso,
       snapshotBy: reviewerId,
       changeType: decision === "approved" ? "review_approved" : "review_rejected",
       reason: decision === "rejected"
@@ -402,11 +401,23 @@ exports.submitReviewDecision = async (req, res) => {
 
     if (decision === "approved") {
       updatePayload.stage = "Ready To Post";
+      updatePayload.reviewStatusCode = REVIEW_STATUS.APPROVED;
+      updatePayload.approvedAt = nowIso;
+      // Clear any stale rejection artefacts from a prior rejection cycle
       updatePayload.rejectionReason = admin.firestore.FieldValue.delete();
+      updatePayload.rejectedAt = admin.firestore.FieldValue.delete();
     } else {
       updatePayload.stage = "Update";
+      updatePayload.reviewStatusCode = REVIEW_STATUS.REJECTED;
       updatePayload.rejectionReason = String(rejectionReason || "").trim();
+      updatePayload.rejectedAt = nowIso;
+      // Clear any stale approval artefact from a prior approval cycle
+      updatePayload.approvedAt = admin.firestore.FieldValue.delete();
     }
+    updatePayload.wasResubmitted = admin.firestore.FieldValue.delete();
+    updatePayload.resubmittedAt = admin.firestore.FieldValue.delete();
+    updatePayload.previousRejectionReason = admin.firestore.FieldValue.delete();
+    updatePayload.previousRejectedAt = admin.firestore.FieldValue.delete();
 
     // Aminah updated: atomically append the snapshot to the versionHistory array alongside the review decision update.
     await contentRef.update({
@@ -432,6 +443,7 @@ exports.submitReviewDecision = async (req, res) => {
           metadata: {
             contentTitle,
             reviewStatus: decision,
+            reviewStatusCode: REVIEW_STATUS.APPROVED,
             reviewedAt: updatePayload.reviewedAt,
             actionRoute: "/dashboard",
             actionLabel: "Go to content",
@@ -450,6 +462,7 @@ exports.submitReviewDecision = async (req, res) => {
           metadata: {
             contentTitle,
             reviewStatus: decision,
+            reviewStatusCode: REVIEW_STATUS.REJECTED,
             rejectionReason: String(rejectionReason || "").trim(),
             reviewedAt: updatePayload.reviewedAt,
             actionRoute: "/dashboard",
@@ -463,6 +476,154 @@ exports.submitReviewDecision = async (req, res) => {
   } catch (error) {
     console.error("ERROR in submitReviewDecision:", error);
     return res.status(500).json({ error: error.message || "Failed to submit review decision" });
+  }
+};
+
+/**
+ * revertReviewDecision - Allows the assigned reviewer to undo an approval.
+ */
+exports.revertReviewDecision = async (req, res) => {
+  console.log("POST /api/team/review-revert - START");
+
+  try {
+    const { reviewerId, contentId, target, rejectionReason } = req.body;
+
+    if (!reviewerId || !contentId) {
+      return res.status(400).json({ error: "reviewerId and contentId are required" });
+    }
+
+    const normalizedTarget = String(target || "assigned").toLowerCase();
+    if (!["assigned", "rejected"].includes(normalizedTarget)) {
+      return res.status(400).json({ error: "target must be 'assigned' or 'rejected'" });
+    }
+
+    if (normalizedTarget === "rejected" && !String(rejectionReason || "").trim()) {
+      return res
+        .status(400)
+        .json({ error: "rejectionReason is required when reverting to rejected" });
+    }
+
+    const reviewerDoc = await db.collection("Users").doc(reviewerId).get();
+    if (!reviewerDoc.exists) {
+      return res.status(404).json({ error: "Reviewer not found" });
+    }
+
+    const reviewerData = reviewerDoc.data() || {};
+    if (reviewerData.role !== "reviewer") {
+      return res.status(403).json({ error: "Only reviewers can revert review decisions" });
+    }
+
+    const contentRef = db.collection("content").doc(contentId);
+    const contentDoc = await contentRef.get();
+    if (!contentDoc.exists) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    const contentData = contentDoc.data() || {};
+    if (contentData.reviewerId !== reviewerId) {
+      return res.status(403).json({ error: "You are not assigned to review this content" });
+    }
+
+    const currentStatusCode = String(contentData.reviewStatusCode || "").toUpperCase();
+    const legacyStatus = String(contentData.reviewStatus || "").toLowerCase();
+    const isCurrentlyApproved =
+      currentStatusCode === REVIEW_STATUS.APPROVED || legacyStatus === "approved";
+
+    if (!isCurrentlyApproved) {
+      return res
+        .status(409)
+        .json({ error: "Only approved content can be reverted." });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    const previousSnapshot = {
+      title: contentData.title || "",
+      text: contentData.text || "",
+      stage: contentData.stage || "Ready To Post",
+      snapshotAt: nowIso,
+      snapshotBy: reviewerId,
+      changeType: "review_reverted",
+      reason:
+        normalizedTarget === "rejected"
+          ? `Approval reverted — changes requested: ${String(rejectionReason).trim()}`
+          : "Approval reverted — moved back to review queue",
+    };
+
+    const updatePayload = {
+      reviewedAt: nowIso,
+      reviewedBy: reviewerId,
+      approvedAt: admin.firestore.FieldValue.delete(),
+    };
+
+    if (normalizedTarget === "rejected") {
+      updatePayload.stage = "Update";
+      updatePayload.reviewStatus = "rejected";
+      updatePayload.reviewStatusCode = REVIEW_STATUS.REJECTED;
+      updatePayload.rejectionReason = String(rejectionReason).trim();
+      updatePayload.rejectedAt = nowIso;
+    } else {
+      updatePayload.stage = "Review";
+      updatePayload.reviewStatus = admin.firestore.FieldValue.delete();
+      updatePayload.reviewStatusCode = REVIEW_STATUS.ASSIGNED;
+      updatePayload.rejectionReason = admin.firestore.FieldValue.delete();
+      updatePayload.rejectedAt = admin.firestore.FieldValue.delete();
+    }
+
+    // Clear any lingering "resubmitted after rejection" markers on revert —
+    // the reviewer has now acted fresh, so the context from a prior resubmission
+    // no longer applies.
+    updatePayload.wasResubmitted = admin.firestore.FieldValue.delete();
+    updatePayload.resubmittedAt = admin.firestore.FieldValue.delete();
+    updatePayload.previousRejectionReason = admin.firestore.FieldValue.delete();
+    updatePayload.previousRejectedAt = admin.firestore.FieldValue.delete();
+
+    await contentRef.update({
+      ...updatePayload,
+      versionHistory: admin.firestore.FieldValue.arrayUnion(previousSnapshot),
+    });
+
+    const creatorId = contentData.createdBy;
+    if (creatorId) {
+      const reviewerName = buildDisplayName(reviewerData);
+      const contentTitle = contentData.title || "Untitled";
+
+      await createNotification({
+        recipientId: creatorId,
+        type: "review_reverted",
+        title: "Approval Reverted",
+        message:
+          normalizedTarget === "rejected"
+            ? `${reviewerName} reverted the approval on \"${contentTitle}\" and requested changes.`
+            : `${reviewerName} reverted the approval on \"${contentTitle}\" — it's back in review.`,
+        contentId,
+        actorId: reviewerId,
+        eventKey: `review_reverted_${contentId}_${reviewerId}_${nowIso}`,
+        dedupe: false,
+        metadata: {
+          contentTitle,
+          reviewStatusCode: updatePayload.reviewStatusCode,
+          revertedTo: normalizedTarget,
+          rejectionReason:
+            normalizedTarget === "rejected" ? String(rejectionReason).trim() : null,
+          revertedAt: nowIso,
+          actionRoute: "/dashboard",
+          actionLabel: "Go to content",
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      contentId,
+      target: normalizedTarget,
+      ...updatePayload,
+    });
+  } catch (error) {
+    console.error("ERROR in revertReviewDecision:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to revert review decision" });
   }
 };
 
@@ -533,7 +694,42 @@ exports.submitAuthorContentUpdate = async (req, res) => {
         updatePayload.reviewerId = assignedReviewer.id;
         updatePayload.assignedAt = new Date().toISOString();
         updatePayload.assignedBy = authorId;
+        // Seed a clean ASSIGNED status for a fresh assignment
+        updatePayload.reviewStatusCode = REVIEW_STATUS.ASSIGNED;
+        updatePayload.reviewStatus = admin.firestore.FieldValue.delete();
       }
+    }
+
+    // When an author re-submits previously-rejected content for another review pass, we want to preserve the context of the prior rejection for the reviewer to reference during their next review. This includes retaining the original rejection reason and timestamp in dedicated "previous" fields, and marking the item as resubmitted with a timestamp so the reviewer can easily filter for or identify resubmissions in the queue.
+    const wasRejectedBefore =
+      String(contentData.reviewStatus || "").toLowerCase() === "rejected" ||
+      String(contentData.reviewStatusCode || "").toUpperCase() === REVIEW_STATUS.REJECTED ||
+      String(contentData.stage || "").toLowerCase() === "update" ||
+      Boolean(contentData.rejectionReason);
+
+    const isResubmission = wasRejectedBefore && nextStageNormalized === "review";
+
+    if (isResubmission) {
+      updatePayload.reviewStatusCode = REVIEW_STATUS.ASSIGNED;
+      updatePayload.reviewStatus = admin.firestore.FieldValue.delete();
+
+      // Preserve the rejection context for the reviewer to see. Only write
+      // previousRejectionReason if there actually was one — otherwise just mark
+      // the item as resubmitted without fabricating a reason.
+      const priorReason = String(contentData.rejectionReason || "").trim();
+      if (priorReason) {
+        updatePayload.previousRejectionReason = priorReason;
+      }
+      if (contentData.rejectedAt) {
+        updatePayload.previousRejectedAt = contentData.rejectedAt;
+      }
+
+      updatePayload.wasResubmitted = true;
+      updatePayload.resubmittedAt = new Date().toISOString();
+
+      // Clear the "current" rejection fields so the item no longer reads as rejected.
+      updatePayload.rejectionReason = admin.firestore.FieldValue.delete();
+      updatePayload.rejectedAt = admin.firestore.FieldValue.delete();
     }
 
     await contentRef.update(updatePayload);
@@ -572,19 +768,27 @@ exports.submitAuthorContentUpdate = async (req, res) => {
       const contentTitle = (typeof title === "string" && title.trim())
         ? title.trim()
         : contentData.title || "Untitled";
+      const isResubmissionNotification = isResubmission;
 
       await createNotification({
         recipientId: reviewerId,
-        type: "content_updated",
-        title: "Content Updated",
-        message: `${authorName} updated \"${contentTitle}\" after your feedback.`,
+        type: isResubmissionNotification ? "content_resubmitted" : "content_updated",
+        title: isResubmissionNotification ? "Resubmitted for Review" : "Content Updated",
+        message: isResubmissionNotification
+          ? `${authorName} updated \"${contentTitle}\" and resubmitted it for review.`
+          : `${authorName} updated \"${contentTitle}\" after your feedback.`,
         contentId,
         actorId: authorId,
-        eventKey: `content_updated_${contentId}_${Date.now()}`,
+        eventKey: isResubmissionNotification
+          ? `content_resubmitted_${contentId}_${Date.now()}`
+          : `content_updated_${contentId}_${Date.now()}`,
         metadata: {
           contentTitle,
           previousStage: contentData.stage || null,
           newStage: updatePayload.stage || contentData.stage || null,
+          ...(isResubmissionNotification ? { wasResubmitted: true } : {}),
+          actionRoute: "/review",
+          actionLabel: "Go to review",
         },
       });
     }
@@ -651,3 +855,5 @@ exports.removeMemberFromTeam = async (req, res) => {
     res.status(500).json({ error: error.message || "Failed to remove member" });
   }
 };
+
+exports.REVIEW_STATUS = REVIEW_STATUS;

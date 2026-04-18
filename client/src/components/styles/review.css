@@ -475,3 +475,204 @@ textarea:focus {
 .notification-highlight {
   animation: orange-glow 5s ease-in-out 1;
 }
+/*   Review status filter tabs (All / Assigned / Approved / Rejected)
+  */
+.review-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+  background-color: #f3f4f6;
+  border-radius: 10px;
+  margin: 4px 0 20px 0;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.review-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.review-filter-tab:hover:not(.active) {
+  background-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.review-filter-tab.active {
+  background-color: #ffffff;
+  color: #7c3aed;
+  border-color: #e0d7ff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.review-filter-tab-label {
+  line-height: 1;
+}
+
+.review-filter-tab-count {
+  min-width: 22px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  background-color: #e5e7eb;
+  color: #4b5563;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.review-filter-tab.active .review-filter-tab-count {
+  background-color: #f3f0ff;
+  color: #7c3aed;
+}
+
+/*   ASSIGNED status pill (extends the existing approved / rejected pills)
+  */
+.review-status.assigned {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+
+/*   Card-level action row (currently just the Revert button on approved items)
+  */
+.review-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/*   Revert approval button
+  */
+.btn-revert {
+  padding: 8px 16px;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  background-color: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-revert:hover:not(:disabled) {
+  background-color: #fef3c7;
+  border-color: #f59e0b;
+  color: #78350f;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
+}
+
+.btn-revert:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modal-actions .btn-revert {
+  padding: 10px 24px;
+  font-size: 14px;
+}
+
+.revert-target-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.revert-target-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #ffffff;
+}
+
+.revert-target-option:hover {
+  border-color: #c4b5fd;
+  background-color: #faf9ff;
+}
+
+.revert-target-option input[type="radio"] {
+  margin-top: 4px;
+  accent-color: #7c3aed;
+  cursor: pointer;
+}
+
+.revert-target-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.revert-target-option strong {
+  font-size: 14px;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.revert-target-option small {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.review-status.resubmitted {
+  background-color: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+.dashboard-content-card.is-resubmitted {
+  border-color: #c4b5fd;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.08);
+}
+
+.dashboard-content-card.is-resubmitted:hover {
+  border-color: #a78bfa;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.16);
+}
+.previous-feedback {
+  background-color: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  padding: 12px 14px;
+  border-radius: 6px;
+  margin: 12px 0;
+  font-size: 14px;
+  color: #1e3a8a;
+}
+
+.previous-feedback strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.previous-feedback p {
+  margin: 4px 0 8px 0;
+  color: #1e3a8a;
+  line-height: 1.5;
+}
+
+.previous-feedback small {
+  display: block;
+  color: #3b82f6;
+  font-size: 12px;
+  font-style: italic;
+}
