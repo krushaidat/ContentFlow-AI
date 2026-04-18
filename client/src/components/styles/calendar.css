@@ -294,6 +294,7 @@
 .calendar-day {
   background: white;
   min-height: 120px;
+  min-width: 0;
   padding: 0.75rem;
   position: relative;
   display: flex;
@@ -326,9 +327,15 @@
   flex-direction: column;
   gap: 0.35rem;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .event-badge {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.35rem 0.55rem;
   border-radius: 0.3rem;
   font-size: 0.7rem;
