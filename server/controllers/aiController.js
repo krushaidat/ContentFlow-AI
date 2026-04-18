@@ -3,7 +3,7 @@
  * Authors: Tanvir (original), refactored
  */
 
-const { db } = require("../config/firebase");
+const { db, admin } = require("../config/firebase");
 const { GoogleGenerativeAI, SchemaType } = require("@google/generative-ai");
 const { createNotification } = require("../utils/notificationService");
 
@@ -292,18 +292,35 @@ ${issues.length ? issues.join("; ") : "Improve based on guidelines."}`;
 
     const result = await callGemini(model, prompt);
 
-    await postRef.update({
-      title: result.fixedTitle || post.title,
-      text: result.fixedText || post.text,
-      lastFixedAt: new Date().toISOString(),
+    const nextTitle = result.fixedTitle || post.title;
+    const nextText = result.fixedText || post.text;
+    const nowIso = new Date().toISOString();
+    const updatePayload = {
+      title: nextTitle,
+      text: nextText,
+      lastFixedAt: nowIso,
       fixChangesSummary: result.changesSummary || [],
-      updatedAt: new Date().toISOString(),
-    });
+      updatedAt: nowIso,
+    };
+
+    if (nextTitle !== (post.title || "") || nextText !== (post.text || "")) {
+      updatePayload.versionHistory = admin.firestore.FieldValue.arrayUnion({
+        title: post.title || "",
+        text: post.text || "",
+        stage: post.stage || "Draft",
+        snapshotAt: nowIso,
+        snapshotBy: post.createdBy || "system",
+        changeType: "ai_fix",
+        reason: "AI fixes applied in workflow",
+      });
+    }
+
+    await postRef.update(updatePayload);
 
     return res.json({
       success: true,
-      fixedTitle: result.fixedTitle || post.title,
-      fixedText: result.fixedText || post.text,
+      fixedTitle: nextTitle,
+      fixedText: nextText,
       changesSummary: result.changesSummary || [],
     });
   } catch (err) {

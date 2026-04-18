@@ -11,18 +11,23 @@
 const mockGet = jest.fn();
 const mockUpdate = jest.fn();
 const mockAdd = jest.fn();
+const mockArrayUnion = jest.fn((value) => ({ __arrayUnion: value }));
 const mockDoc = jest.fn(() => ({ get: mockGet, update: mockUpdate }));
 const mockWhere = jest.fn().mockReturnThis();
 const mockCollection = jest.fn(() => ({ doc: mockDoc, where: mockWhere, get: mockGet, add: mockAdd }));
 
-jest.mock("../config/firebase", () => ({
-  collection: mockCollection,
-  doc: mockDoc,
-}));
-
-// Make the mock db behave like the real one
 const mockDb = { collection: mockCollection };
-jest.mock("../config/firebase", () => mockDb);
+jest.mock("../config/firebase", () => ({
+  db: mockDb,
+  admin: {
+    firestore: {
+      FieldValue: {
+        arrayUnion: mockArrayUnion,
+        delete: jest.fn(),
+      },
+    },
+  },
+}));
 
 // Mock Gemini API
 const mockGenerateContent = jest.fn();
@@ -37,7 +42,7 @@ jest.mock("@google/generative-ai", () => ({
 // Set env before requiring controller
 process.env.GEMINI_API_KEY = "test-api-key";
 
-const { validatePost, suggestPostTime } = require("../controllers/aiController");
+const { validatePost, applyFixes, suggestPostTime } = require("../controllers/aiController");
 
 // Helper to create mock req/res
 const mockReq = (body) => ({ body });
@@ -50,6 +55,82 @@ const mockRes = () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+describe("AI apply fixes version history", () => {
+  test("stores the previous content in versionHistory before saving AI fixes", async () => {
+    const req = mockReq({ postId: "post_fix_001" });
+    const res = mockRes();
+
+    const mockUpdateFn = jest.fn().mockResolvedValue({});
+
+    mockDb.collection = jest.fn((collectionName) => ({
+      doc: jest.fn((docId) => ({
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({
+            title: "Old title",
+            text: "Old content body",
+            stage: "Draft",
+            createdBy: "user_123",
+            templateId: "new-product-launch",
+            validation: {
+              suggestions: ["Tighten CTA"],
+            },
+          }),
+        }),
+        update: mockUpdateFn,
+      })),
+    }));
+
+    mockGenerateContent.mockResolvedValue({
+      response: {
+        text: () =>
+          JSON.stringify({
+            fixedTitle: "Improved title",
+            fixedText: "Improved content body",
+            changesSummary: ["Updated CTA"],
+          }),
+      },
+    });
+
+    await applyFixes(req, res);
+
+    expect(mockArrayUnion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Old title",
+        text: "Old content body",
+        stage: "Draft",
+        snapshotBy: "user_123",
+        changeType: "ai_fix",
+        reason: "AI fixes applied in workflow",
+      })
+    );
+
+    expect(mockUpdateFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Improved title",
+        text: "Improved content body",
+        fixChangesSummary: ["Updated CTA"],
+        versionHistory: expect.objectContaining({
+          __arrayUnion: expect.objectContaining({
+            title: "Old title",
+            text: "Old content body",
+            changeType: "ai_fix",
+          }),
+        }),
+      })
+    );
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        fixedTitle: "Improved title",
+        fixedText: "Improved content body",
+        changesSummary: ["Updated CTA"],
+      })
+    );
+  });
 });
 
 // =============================================
