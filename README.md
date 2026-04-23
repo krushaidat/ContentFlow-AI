@@ -97,6 +97,13 @@ FIREBASE_PROJECT_ID=your_firebase_project_id
 FIREBASE_PRIVATE_KEY=your_firebase_private_key
 FIREBASE_CLIENT_EMAIL=your_firebase_client_email
 PORT=5000
+GOOGLE_OAUTH_CLIENT_ID= your_information
+GOOGLE_OAUTH_CLIENT_SECRET= your_information
+GOOGLE_OAUTH_REDIRECT_URI= your_information
+GOOGLE_OAUTH_SUCCESS_REDIRECT= your_information
+GOOGLE_OAUTH_ERROR_REDIRECT= your_information
+GOOGLE_OAUTH_STATE_SECRET= your_information
+DRIVE_TOKEN_ENCRYPTION_KEY= your_information
 ```
 
 ## 🚀 Running the Application
@@ -193,24 +200,5 @@ Tests use Jest. See [Backend Setup Guide](#backend-setup-server) for detailed co
 - Component-based React structure
 - Client-side routing with React Router
 - ESLint for code quality
-
-## 📄 License
-
-This project does not currently have a specified license. Please see the repository for more information.
-
-## 👤 Author
-
-**CyTanvir**
-- GitHub: [@CyTanvir](https://github.com/CyTanvir)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📞 Support
-
-For questions or issues, please open an issue on the [GitHub repository](https://github.com/CyTanvir/ContentFlow-AI/issues).
-
----
 
 **Last Updated:** 2026-04-23 07:11:00
